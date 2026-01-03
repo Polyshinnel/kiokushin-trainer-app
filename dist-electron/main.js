@@ -1,7 +1,9 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 import Database from "better-sqlite3";
+import { createHash } from "crypto";
 const migrations = [
   {
     version: 1,
@@ -124,6 +126,31 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_lessons_group ON lessons(group_id);
       CREATE INDEX IF NOT EXISTS idx_attendance_lesson ON attendance(lesson_id);
     `
+  },
+  {
+    version: 2,
+    name: "add_employee_login_password",
+    up: (db2) => {
+      db2.exec(`
+        ALTER TABLE employees ADD COLUMN login TEXT;
+        ALTER TABLE employees ADD COLUMN password TEXT;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_login ON employees(login) WHERE login IS NOT NULL;
+      `);
+      const passwordHash = createHash("sha256").update("kiokushinkai_123").digest("hex");
+      const existingUser = db2.prepare("SELECT id FROM employees WHERE login = ?").get("mishustin_r");
+      if (!existingUser) {
+        db2.prepare(`
+          INSERT INTO employees (full_name, login, password)
+          VALUES (?, ?, ?)
+        `).run("Мишустин Р.", "mishustin_r", passwordHash);
+        console.log("Created default user: mishustin_r");
+      } else {
+        db2.prepare(`
+          UPDATE employees SET password = ? WHERE login = ?
+        `).run(passwordHash, "mishustin_r");
+        console.log("Updated password for user: mishustin_r");
+      }
+    }
   }
 ];
 function runMigrations(db2) {
@@ -139,7 +166,11 @@ function runMigrations(db2) {
   for (const migration of migrations) {
     if (!appliedVersions.has(migration.version)) {
       console.log(`Applying migration ${migration.version}: ${migration.name}`);
-      db2.exec(migration.up);
+      if (typeof migration.up === "function") {
+        migration.up(db2);
+      } else {
+        db2.exec(migration.up);
+      }
       db2.prepare("INSERT INTO migrations (version, name) VALUES (?, ?)").run(migration.version, migration.name);
     }
   }
@@ -177,13 +208,15 @@ const employeeQueries = {
   create(data) {
     const db2 = getDatabase();
     const stmt = db2.prepare(`
-      INSERT INTO employees (full_name, birth_year, phone)
-      VALUES (@full_name, @birth_year, @phone)
+      INSERT INTO employees (full_name, birth_year, phone, login, password)
+      VALUES (@full_name, @birth_year, @phone, @login, @password)
     `);
     const result = stmt.run({
       full_name: data.full_name,
       birth_year: data.birth_year ?? null,
-      phone: data.phone ?? null
+      phone: data.phone ?? null,
+      login: data.login ?? null,
+      password: data.password ?? null
     });
     return this.getById(result.lastInsertRowid);
   },
@@ -203,6 +236,14 @@ const employeeQueries = {
       fields.push("phone = @phone");
       values.phone = data.phone;
     }
+    if (data.login !== void 0) {
+      fields.push("login = @login");
+      values.login = data.login;
+    }
+    if (data.password !== void 0) {
+      fields.push("password = @password");
+      values.password = data.password;
+    }
     if (fields.length === 0) return this.getById(id);
     fields.push("updated_at = CURRENT_TIMESTAMP");
     fields.push("sync_status = 'pending'");
@@ -216,6 +257,20 @@ const employeeQueries = {
     const db2 = getDatabase();
     const result = db2.prepare("DELETE FROM employees WHERE id = ?").run(id);
     return result.changes > 0;
+  },
+  authenticate(login, password) {
+    const db2 = getDatabase();
+    const passwordHash = createHash("sha256").update(password).digest("hex");
+    const employee = db2.prepare("SELECT * FROM employees WHERE login = ? AND password = ?").get(login, passwordHash);
+    if (!employee) {
+      const userExists = db2.prepare("SELECT id, login FROM employees WHERE login = ?").get(login);
+      if (userExists) {
+        console.log(`User ${login} exists but password doesn't match`);
+      } else {
+        console.log(`User ${login} not found`);
+      }
+    }
+    return employee || null;
   }
 };
 const clientQueries = {
@@ -695,6 +750,7 @@ function setupIpcHandlers() {
   ipcMain.handle("db:employees:create", (_, data) => employeeQueries.create(data));
   ipcMain.handle("db:employees:update", (_, id, data) => employeeQueries.update(id, data));
   ipcMain.handle("db:employees:delete", (_, id) => employeeQueries.delete(id));
+  ipcMain.handle("auth:login", (_, login, password) => employeeQueries.authenticate(login, password));
   ipcMain.handle("db:clients:getAll", () => clientQueries.getAll());
   ipcMain.handle("db:clients:getById", (_, id) => clientQueries.getById(id));
   ipcMain.handle("db:clients:search", (_, query) => clientQueries.search(query));
@@ -735,13 +791,38 @@ function setupIpcHandlers() {
   });
 }
 function createWindow() {
+  let preloadPath = path.join(__dirname$1, "preload.cjs");
+  if (!existsSync(preloadPath)) {
+    const altPath = path.resolve(process.cwd(), "dist-electron", "preload.cjs");
+    if (existsSync(altPath)) {
+      preloadPath = altPath;
+      console.log(`Using alternative preload path: ${preloadPath}`);
+    } else {
+      const jsPath = path.join(__dirname$1, "preload.js");
+      const jsAltPath = path.resolve(process.cwd(), "dist-electron", "preload.js");
+      if (existsSync(jsPath)) {
+        preloadPath = jsPath;
+        console.log(`Using .js preload path: ${preloadPath}`);
+      } else if (existsSync(jsAltPath)) {
+        preloadPath = jsAltPath;
+        console.log(`Using alternative .js preload path: ${preloadPath}`);
+      } else {
+        console.error(`Preload script not found at: ${preloadPath}`);
+        console.error(`Alternative paths also not found`);
+        console.error(`__dirname: ${__dirname$1}`);
+        console.error(`process.cwd(): ${process.cwd()}`);
+      }
+    }
+  } else {
+    console.log(`Preload script found at: ${preloadPath}`);
+  }
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
     minHeight: 768,
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.js"),
+      preload: path.resolve(preloadPath),
       nodeIntegration: false,
       contextIsolation: true
     },

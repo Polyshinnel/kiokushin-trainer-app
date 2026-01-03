@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { existsSync } from 'fs'
 import { initDatabase, closeDatabase } from './database'
 import { employeeQueries } from './database/queries/employees'
 import { clientQueries } from './database/queries/clients'
@@ -17,6 +18,7 @@ function setupIpcHandlers() {
   ipcMain.handle('db:employees:create', (_, data) => employeeQueries.create(data))
   ipcMain.handle('db:employees:update', (_, id, data) => employeeQueries.update(id, data))
   ipcMain.handle('db:employees:delete', (_, id) => employeeQueries.delete(id))
+  ipcMain.handle('auth:login', (_, login, password) => employeeQueries.authenticate(login, password))
 
   ipcMain.handle('db:clients:getAll', () => clientQueries.getAll())
   ipcMain.handle('db:clients:getById', (_, id) => clientQueries.getById(id))
@@ -67,13 +69,40 @@ function setupIpcHandlers() {
 }
 
 function createWindow() {
+  let preloadPath = path.join(__dirname, 'preload.cjs')
+  
+  if (!existsSync(preloadPath)) {
+    const altPath = path.resolve(process.cwd(), 'dist-electron', 'preload.cjs')
+    if (existsSync(altPath)) {
+      preloadPath = altPath
+      console.log(`Using alternative preload path: ${preloadPath}`)
+    } else {
+      const jsPath = path.join(__dirname, 'preload.js')
+      const jsAltPath = path.resolve(process.cwd(), 'dist-electron', 'preload.js')
+      if (existsSync(jsPath)) {
+        preloadPath = jsPath
+        console.log(`Using .js preload path: ${preloadPath}`)
+      } else if (existsSync(jsAltPath)) {
+        preloadPath = jsAltPath
+        console.log(`Using alternative .js preload path: ${preloadPath}`)
+      } else {
+        console.error(`Preload script not found at: ${preloadPath}`)
+        console.error(`Alternative paths also not found`)
+        console.error(`__dirname: ${__dirname}`)
+        console.error(`process.cwd(): ${process.cwd()}`)
+      }
+    }
+  } else {
+    console.log(`Preload script found at: ${preloadPath}`)
+  }
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
     minHeight: 768,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.resolve(preloadPath),
       nodeIntegration: false,
       contextIsolation: true
     },

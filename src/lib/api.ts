@@ -61,3 +61,12 @@ export const attendanceApi = {
   getStatsByGroup: (groupId: number) => window.electronAPI.db.query('attendance:getStatsByGroup', groupId)
 }
 
+export const authApi = {
+  login: async (login: string, password: string) => {
+    if (typeof window === 'undefined' || !window.electronAPI?.auth) {
+      throw new Error('Electron API is not available. Please run the application in Electron.')
+    }
+    return window.electronAPI.auth.login(login, password)
+  }
+}
+

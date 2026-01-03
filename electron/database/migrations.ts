@@ -1,6 +1,13 @@
 import Database from 'better-sqlite3'
+import { createHash } from 'crypto'
 
-const migrations = [
+type Migration = {
+  version: number
+  name: string
+  up: string | ((db: Database.Database) => void)
+}
+
+const migrations: Migration[] = [
   {
     version: 1,
     name: 'initial_schema',
@@ -122,6 +129,33 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_lessons_group ON lessons(group_id);
       CREATE INDEX IF NOT EXISTS idx_attendance_lesson ON attendance(lesson_id);
     `
+  },
+  {
+    version: 2,
+    name: 'add_employee_login_password',
+    up: (db: Database.Database) => {
+      db.exec(`
+        ALTER TABLE employees ADD COLUMN login TEXT;
+        ALTER TABLE employees ADD COLUMN password TEXT;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_login ON employees(login) WHERE login IS NOT NULL;
+      `)
+
+      const passwordHash = createHash('sha256').update('kiokushinkai_123').digest('hex')
+      
+      const existingUser = db.prepare('SELECT id FROM employees WHERE login = ?').get('mishustin_r') as { id: number } | undefined
+      if (!existingUser) {
+        db.prepare(`
+          INSERT INTO employees (full_name, login, password)
+          VALUES (?, ?, ?)
+        `).run('Мишустин Р.', 'mishustin_r', passwordHash)
+        console.log('Created default user: mishustin_r')
+      } else {
+        db.prepare(`
+          UPDATE employees SET password = ? WHERE login = ?
+        `).run(passwordHash, 'mishustin_r')
+        console.log('Updated password for user: mishustin_r')
+      }
+    }
   }
 ]
 
@@ -144,7 +178,11 @@ export function runMigrations(db: Database.Database): void {
     if (!appliedVersions.has(migration.version)) {
       console.log(`Applying migration ${migration.version}: ${migration.name}`)
       
-      db.exec(migration.up)
+      if (typeof migration.up === 'function') {
+        migration.up(db)
+      } else {
+        db.exec(migration.up)
+      }
       
       db.prepare('INSERT INTO migrations (version, name) VALUES (?, ?)')
         .run(migration.version, migration.name)

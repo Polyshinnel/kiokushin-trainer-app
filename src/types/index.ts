@@ -3,6 +3,8 @@ export interface Employee {
   full_name: string
   birth_year: number | null
   phone: string | null
+  login: string | null
+  password: string | null
   created_at: string
   updated_at: string
   sync_status: string

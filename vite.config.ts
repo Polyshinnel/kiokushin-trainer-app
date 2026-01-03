@@ -4,6 +4,23 @@ import tailwindcss from '@tailwindcss/vite'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import path from 'path'
+import type { Plugin } from 'rollup'
+
+const removeExportPlugin = (): Plugin => ({
+  name: 'remove-export',
+  renderChunk(code, chunk) {
+    if (chunk.fileName === 'preload.cjs') {
+      return code.replace(/export default [^;]+;/g, 'require_preload();')
+    }
+    return null
+  },
+  generateBundle(_, bundle) {
+    const chunk = bundle['preload.cjs']
+    if (chunk && chunk.type === 'chunk') {
+      chunk.code = chunk.code.replace(/export default [^;]+;/g, 'require_preload();')
+    }
+  }
+})
 
 export default defineConfig({
   plugins: [
@@ -37,8 +54,10 @@ export default defineConfig({
             outDir: 'dist-electron',
             rollupOptions: {
               output: {
-                format: 'cjs'
-              }
+                format: 'cjs',
+                entryFileNames: 'preload.cjs'
+              },
+              plugins: [removeExportPlugin()]
             }
           }
         }
