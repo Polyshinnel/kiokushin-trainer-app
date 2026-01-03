@@ -9,9 +9,9 @@ export const employeesApi = {
 }
 
 export const clientsApi = {
-  getAll: () => window.electronAPI.db.query('clients:getAll'),
+  getAll: (filters?: any) => window.electronAPI.db.query('clients:getAll', filters),
   getById: (id: number) => window.electronAPI.db.query('clients:getById', id),
-  search: (query: string) => window.electronAPI.db.query('clients:search', query),
+  search: (query: string, filters?: any) => window.electronAPI.db.query('clients:search', query, filters),
   getDebtors: (days?: number) => window.electronAPI.db.query('clients:getDebtors', days),
   create: (data: any) => window.electronAPI.db.query('clients:create', data),
   update: (id: number, data: any) => window.electronAPI.db.query('clients:update', id, data),

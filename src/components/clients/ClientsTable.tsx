@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import type { Client } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Pencil, Trash2, CreditCard } from 'lucide-react'
+import { Pencil, Trash2, CreditCard, Eye } from 'lucide-react'
 import { calculateAge, formatPhone, formatDate } from '@/lib/utils'
 
 interface ClientsTableProps {
@@ -20,6 +21,7 @@ interface ClientsTableProps {
 }
 
 export function ClientsTable({ clients, onEdit, onDelete, onPayment }: ClientsTableProps) {
+  const navigate = useNavigate()
   const isDebtor = (client: Client) => {
     if (!client.last_payment_date) return true
     const paymentDate = new Date(client.last_payment_date)
@@ -68,6 +70,14 @@ export function ClientsTable({ clients, onEdit, onDelete, onPayment }: ClientsTa
             </TableCell>
             <TableCell className="text-right">
               <div className="flex justify-end gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Просмотр информации"
+                  onClick={() => navigate(`/clients/${client.id}`)}
+                >
+                  <Eye className="w-4 h-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"

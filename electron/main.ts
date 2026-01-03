@@ -20,9 +20,9 @@ function setupIpcHandlers() {
   ipcMain.handle('db:employees:delete', (_, id) => employeeQueries.delete(id))
   ipcMain.handle('auth:login', (_, login, password) => employeeQueries.authenticate(login, password))
 
-  ipcMain.handle('db:clients:getAll', () => clientQueries.getAll())
+  ipcMain.handle('db:clients:getAll', (_, filters) => clientQueries.getAll(filters))
   ipcMain.handle('db:clients:getById', (_, id) => clientQueries.getById(id))
-  ipcMain.handle('db:clients:search', (_, query) => clientQueries.search(query))
+  ipcMain.handle('db:clients:search', (_, query, filters) => clientQueries.search(query, filters))
   ipcMain.handle('db:clients:getDebtors', (_, days) => clientQueries.getDebtors(days))
   ipcMain.handle('db:clients:create', (_, data) => clientQueries.create(data))
   ipcMain.handle('db:clients:update', (_, id, data) => clientQueries.update(id, data))

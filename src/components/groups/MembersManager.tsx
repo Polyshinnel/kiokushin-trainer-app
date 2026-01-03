@@ -37,7 +37,9 @@ export function MembersManager({ members, onAdd, onRemove }: MembersManagerProps
   }, [isDialogOpen])
 
   const loadClients = async () => {
-    const clients = await clientsApi.getAll() as Client[]
+    const result = await clientsApi.getAll({ page: 1, limit: 10000 })
+    const clientsResult = result as { data?: Client[]; total?: number }
+    const clients = clientsResult.data || []
     const memberIds = new Set(members.map(m => m.client_id))
     setAvailableClients(clients.filter(c => !memberIds.has(c.id)))
   }

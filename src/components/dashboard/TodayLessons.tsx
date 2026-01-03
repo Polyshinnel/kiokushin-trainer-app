@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -6,10 +6,13 @@ import { Calendar, Clock, Users, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useLessonsStore } from '@/stores/lessonsStore'
 import { formatTime, cn } from '@/lib/utils'
+import { AttendanceDialog } from '@/components/lessons/AttendanceDialog'
+import type { Lesson } from '@/types'
 
 export function TodayLessons() {
   const navigate = useNavigate()
   const { todayLessons, fetchTodayLessons } = useLessonsStore()
+  const [attendanceLesson, setAttendanceLesson] = useState<Lesson | null>(null)
 
   useEffect(() => {
     fetchTodayLessons()
@@ -53,11 +56,12 @@ export function TodayLessons() {
               return (
                 <div
                   key={lesson.id}
+                  onClick={() => setAttendanceLesson(lesson)}
                   className={cn(
-                    'flex items-center justify-between p-3 rounded-lg border',
-                    isNow && 'border-primary bg-primary/5',
-                    isPast && 'opacity-60',
-                    !isNow && !isPast && 'border-slate-200'
+                    'flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors',
+                    isNow && 'border-primary bg-primary/5 hover:bg-primary/10',
+                    isPast && 'opacity-60 hover:opacity-80',
+                    !isNow && !isPast && 'border-slate-200 hover:bg-slate-50'
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -91,6 +95,12 @@ export function TodayLessons() {
           </div>
         )}
       </CardContent>
+
+      <AttendanceDialog
+        open={!!attendanceLesson}
+        onOpenChange={(open) => !open && setAttendanceLesson(null)}
+        lesson={attendanceLesson}
+      />
     </Card>
   )
 }

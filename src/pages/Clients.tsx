@@ -8,6 +8,7 @@ import { ClientForm } from '@/components/clients/ClientForm'
 import { PaymentDialog } from '@/components/clients/PaymentDialog'
 import { DeleteConfirmDialog } from '@/components/shared/DeleteConfirmDialog'
 import { SearchInput } from '@/components/shared/SearchInput'
+import { Pagination } from '@/components/shared/Pagination'
 import { toast } from 'sonner'
 import { clientsApi } from '@/lib/api'
 import type { Client } from '@/types'
@@ -15,7 +16,8 @@ import type { Client } from '@/types'
 export function Clients() {
   const { 
     clients, isLoading, searchQuery,
-    fetchClients, searchClients, setSearchQuery,
+    totalCount, currentPage, pageSize,
+    fetchClients, searchClients, setSearchQuery, setPage,
     createClient, updateClient, updatePaymentDate, deleteClient 
   } = useClientsStore()
   
@@ -32,12 +34,13 @@ export function Clients() {
   const handleSearch = (query?: string) => {
     const searchValue = query !== undefined ? query : searchQuery
     if (!searchValue.trim()) {
-      setSearchQuery('')
-      fetchClients()
+      searchClients('')
     } else {
       searchClients(searchValue)
     }
   }
+
+  const totalPages = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0
 
   const handleCreate = () => {
     setEditingClient(null)
@@ -104,7 +107,7 @@ export function Clients() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Клиенты" subtitle={`Всего: ${clients.length}`} />
+      <Header title="Клиенты" subtitle={`Всего: ${totalCount} (Страница ${currentPage} из ${totalPages})`} />
       
       <div className="flex-1 p-6">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
@@ -132,12 +135,19 @@ export function Clients() {
             {isLoading ? (
               <div className="text-center py-12 text-slate-500">Загрузка...</div>
             ) : (
-              <ClientsTable
-                clients={clients}
-                onEdit={handleEdit}
-                onDelete={setDeletingClient}
-                onPayment={setPayingClient}
-              />
+              <>
+                <ClientsTable
+                  clients={clients}
+                  onEdit={handleEdit}
+                  onDelete={setDeletingClient}
+                  onPayment={setPayingClient}
+                />
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                />
+              </>
             )}
           </div>
         </div>

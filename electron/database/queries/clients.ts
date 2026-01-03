@@ -38,9 +38,35 @@ export interface UpdateClientDto {
 }
 
 export const clientQueries = {
-  getAll(): Client[] {
+  getAll(filters?: { page?: number; limit?: number; searchQuery?: string }): { data: Client[]; total: number } {
     const db = getDatabase()
-    return db.prepare('SELECT * FROM clients ORDER BY full_name').all() as Client[]
+    const page = filters?.page || 1
+    const limit = filters?.limit || 20
+    const offset = (page - 1) * limit
+    
+    let whereClause = 'WHERE 1=1'
+    const params: unknown[] = []
+    
+    if (filters?.searchQuery) {
+      whereClause += ' AND (full_name LIKE ? OR phone LIKE ?)'
+      const searchPattern = `%${filters.searchQuery}%`
+      params.push(searchPattern, searchPattern)
+    }
+    
+    const countQuery = `SELECT COUNT(*) as total FROM clients ${whereClause}`
+    const totalResult = db.prepare(countQuery).get(...params) as { total: number }
+    const total = totalResult.total
+    
+    const dataQuery = `
+      SELECT * FROM clients 
+      ${whereClause}
+      ORDER BY full_name
+      LIMIT ? OFFSET ?
+    `
+    
+    const data = db.prepare(dataQuery).all(...params, limit, offset) as Client[]
+    
+    return { data, total }
   },
 
   getById(id: number): ClientWithParents | undefined {
@@ -65,13 +91,31 @@ export const clientQueries = {
     `).all(daysSincePayment) as Client[]
   },
 
-  search(query: string): Client[] {
+  search(query: string, filters?: { page?: number; limit?: number }): { data: Client[]; total: number } {
     const db = getDatabase()
-    return db.prepare(`
+    const page = filters?.page || 1
+    const limit = filters?.limit || 20
+    const offset = (page - 1) * limit
+    
+    const searchPattern = `%${query}%`
+    
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM clients 
+      WHERE full_name LIKE ? OR phone LIKE ?
+    `
+    const totalResult = db.prepare(countQuery).get(searchPattern, searchPattern) as { total: number }
+    const total = totalResult.total
+    
+    const dataQuery = `
       SELECT * FROM clients 
       WHERE full_name LIKE ? OR phone LIKE ?
       ORDER BY full_name
-    `).all(`%${query}%`, `%${query}%`) as Client[]
+      LIMIT ? OFFSET ?
+    `
+    const data = db.prepare(dataQuery).all(searchPattern, searchPattern, limit, offset) as Client[]
+    
+    return { data, total }
   },
 
   create(data: CreateClientDto): ClientWithParents {

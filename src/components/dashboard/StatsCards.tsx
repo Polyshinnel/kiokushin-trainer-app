@@ -23,7 +23,7 @@ export function StatsCards() {
   }, [])
 
   const loadStats = async () => {
-    const [clients, groups, todayLessons] = await Promise.all([
+    const [clientsResult, groups, todayLessons] = await Promise.all([
       clientsApi.getAll(),
       groupsApi.getAll(),
       lessonsApi.getTodayLessons()
@@ -33,16 +33,19 @@ export function StatsCards() {
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
     
-    const monthLessons = await lessonsApi.getAll({
+    const monthLessonsResult = await lessonsApi.getAll({
       startDate: startOfMonth.toISOString().split('T')[0],
       endDate: endOfMonth.toISOString().split('T')[0]
     })
 
+    const clients = clientsResult as { data?: any[]; total?: number }
+    const monthLessons = monthLessonsResult as { data?: any[]; total?: number }
+
     setStats({
-      clientsCount: (clients as any[]).length,
+      clientsCount: clients.total ?? (clients.data?.length ?? 0),
       groupsCount: (groups as any[]).length,
       todayLessonsCount: (todayLessons as any[]).length,
-      monthLessonsCount: (monthLessons as any[]).length
+      monthLessonsCount: monthLessons.total ?? (monthLessons.data?.length ?? 0)
     })
   }
 

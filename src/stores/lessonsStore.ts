@@ -7,6 +7,9 @@ interface LessonsState {
   todayLessons: Lesson[]
   currentAttendance: Attendance[]
   isLoading: boolean
+  totalCount: number
+  currentPage: number
+  pageSize: number
   filters: {
     groupId?: number
     startDate?: string
@@ -17,6 +20,7 @@ interface LessonsState {
   fetchTodayLessons: () => Promise<void>
   fetchLessonsByDate: (date: string) => Promise<Lesson[]>
   setFilters: (filters: any) => void
+  setPage: (page: number) => void
   
   generateLessons: (groupId: number, startDate: string, endDate: string) => Promise<number>
   deleteLesson: (id: number) => Promise<boolean>
@@ -48,14 +52,36 @@ export const useLessonsStore = create<LessonsState>((set, get) => ({
   todayLessons: [],
   currentAttendance: [],
   isLoading: false,
+  totalCount: 0,
+  currentPage: 1,
+  pageSize: 20,
   filters: getDefaultDateRange(),
 
   fetchLessons: async () => {
     set({ isLoading: true })
     try {
-      const lessons = await lessonsApi.getAll(get().filters) as Lesson[]
-      set({ lessons, isLoading: false })
+      const state = get()
+      const result = await lessonsApi.getAll({
+        ...state.filters,
+        page: state.currentPage,
+        limit: state.pageSize
+      }) as { data: Lesson[]; total: number }
+      
+      if (result && typeof result === 'object' && 'data' in result && 'total' in result) {
+        set({ 
+          lessons: result.data || [], 
+          totalCount: result.total || 0,
+          isLoading: false 
+        })
+      } else {
+        set({ 
+          lessons: [], 
+          totalCount: 0,
+          isLoading: false 
+        })
+      }
     } catch (error) {
+      console.error('Error fetching lessons:', error)
       set({ isLoading: false })
     }
   },
@@ -71,12 +97,18 @@ export const useLessonsStore = create<LessonsState>((set, get) => ({
   },
 
   setFilters: (filters) => {
-    set({ filters })
+    set({ filters, currentPage: 1 })
+    get().fetchLessons()
+  },
+
+  setPage: (page) => {
+    set({ currentPage: page })
     get().fetchLessons()
   },
 
   generateLessons: async (groupId, startDate, endDate) => {
     const lessons = await lessonsApi.generateFromSchedule(groupId, startDate, endDate) as Lesson[]
+    set({ currentPage: 1 })
     get().fetchLessons()
     return lessons.length
   },
@@ -84,10 +116,19 @@ export const useLessonsStore = create<LessonsState>((set, get) => ({
   deleteLesson: async (id) => {
     const success = await lessonsApi.delete(id) as boolean
     if (success) {
+      const state = get()
+      const remainingOnPage = state.lessons.filter((l) => l.id !== id).length
+      
+      if (remainingOnPage === 0 && state.currentPage > 1) {
+        set({ currentPage: state.currentPage - 1 })
+      }
+      
       set((state) => ({
         lessons: state.lessons.filter((l) => l.id !== id),
         todayLessons: state.todayLessons.filter((l) => l.id !== id)
       }))
+      
+      get().fetchLessons()
     }
     return success
   },

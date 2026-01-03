@@ -31,9 +31,40 @@ export interface AttendanceWithClient extends Attendance {
 }
 
 export const lessonQueries = {
-  getAll(filters?: { groupId?: number; startDate?: string; endDate?: string }): LessonWithDetails[] {
+  getAll(filters?: { groupId?: number; startDate?: string; endDate?: string; page?: number; limit?: number }): { data: LessonWithDetails[]; total: number } {
     const db = getDatabase()
-    let query = `
+    const page = filters?.page || 1
+    const limit = filters?.limit || 30
+    const offset = (page - 1) * limit
+    
+    let whereClause = 'WHERE 1=1'
+    const params: unknown[] = []
+    
+    if (filters?.groupId) {
+      whereClause += ' AND l.group_id = ?'
+      params.push(filters.groupId)
+    }
+    if (filters?.startDate) {
+      whereClause += ' AND l.lesson_date >= ?'
+      params.push(filters.startDate)
+    }
+    if (filters?.endDate) {
+      whereClause += ' AND l.lesson_date <= ?'
+      params.push(filters.endDate)
+    }
+    
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM lessons l
+      JOIN groups g ON l.group_id = g.id
+      LEFT JOIN employees e ON g.trainer_id = e.id
+      ${whereClause}
+    `
+    
+    const totalResult = db.prepare(countQuery).get(...params) as { total: number }
+    const total = totalResult.total
+    
+    const dataQuery = `
       SELECT 
         l.*,
         g.name as group_name,
@@ -43,27 +74,14 @@ export const lessonQueries = {
       FROM lessons l
       JOIN groups g ON l.group_id = g.id
       LEFT JOIN employees e ON g.trainer_id = e.id
-      WHERE 1=1
+      ${whereClause}
+      ORDER BY l.lesson_date ASC, l.start_time ASC
+      LIMIT ? OFFSET ?
     `
     
-    const params: unknown[] = []
+    const data = db.prepare(dataQuery).all(...params, limit, offset) as LessonWithDetails[]
     
-    if (filters?.groupId) {
-      query += ' AND l.group_id = ?'
-      params.push(filters.groupId)
-    }
-    if (filters?.startDate) {
-      query += ' AND l.lesson_date >= ?'
-      params.push(filters.startDate)
-    }
-    if (filters?.endDate) {
-      query += ' AND l.lesson_date <= ?'
-      params.push(filters.endDate)
-    }
-    
-    query += ' ORDER BY l.lesson_date ASC, l.start_time ASC'
-    
-    return db.prepare(query).all(...params) as LessonWithDetails[]
+    return { data, total }
   },
 
   getById(id: number): LessonWithDetails | undefined {
@@ -208,10 +226,10 @@ export const attendanceQueries = {
       .get(lessonId, clientId) as Attendance
   },
 
-  getClientAttendance(clientId: number, startDate?: string, endDate?: string): (Attendance & { lesson_date: string; group_name: string })[] {
+  getClientAttendance(clientId: number, startDate?: string, endDate?: string): (Attendance & { lesson_date: string; group_name: string; start_time: string; end_time: string })[] {
     const db = getDatabase()
     let query = `
-      SELECT a.*, l.lesson_date, g.name as group_name
+      SELECT a.*, l.lesson_date, l.start_time, l.end_time, g.name as group_name
       FROM attendance a
       JOIN lessons l ON a.lesson_id = l.id
       JOIN groups g ON l.group_id = g.id
@@ -231,7 +249,7 @@ export const attendanceQueries = {
     
     query += ' ORDER BY l.lesson_date DESC'
     
-    return db.prepare(query).all(...params) as (Attendance & { lesson_date: string; group_name: string })[]
+    return db.prepare(query).all(...params) as (Attendance & { lesson_date: string; group_name: string; start_time: string; end_time: string })[]
   },
 
   getStatsByGroup(groupId: number): { present: number; absent: number; sick: number; total: number } {

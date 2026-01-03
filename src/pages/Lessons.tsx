@@ -8,11 +8,24 @@ import { LessonsFilters } from '@/components/lessons/LessonsFilters'
 import { GenerateLessonsDialog } from '@/components/lessons/GenerateLessonsDialog'
 import { AttendanceDialog } from '@/components/lessons/AttendanceDialog'
 import { DeleteConfirmDialog } from '@/components/shared/DeleteConfirmDialog'
+import { Pagination } from '@/components/shared/Pagination'
 import { toast } from 'sonner'
 import type { Lesson } from '@/types'
 
 export function Lessons() {
-  const { lessons, isLoading, filters, fetchLessons, setFilters, generateLessons, deleteLesson } = useLessonsStore()
+  const { 
+    lessons, 
+    isLoading, 
+    filters, 
+    totalCount,
+    currentPage,
+    pageSize,
+    fetchLessons, 
+    setFilters, 
+    setPage,
+    generateLessons, 
+    deleteLesson 
+  } = useLessonsStore()
   
   const [isGenerateOpen, setIsGenerateOpen] = useState(false)
   const [attendanceLesson, setAttendanceLesson] = useState<Lesson | null>(null)
@@ -43,9 +56,11 @@ export function Lessons() {
     }
   }
 
+  const totalPages = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0
+
   return (
     <div className="flex flex-col h-full">
-      <Header title="Занятия" subtitle={`Всего: ${lessons.length}`} />
+      <Header title="Занятия" subtitle={`Всего: ${totalCount} (Страница ${currentPage} из ${totalPages})`} />
       
       <div className="flex-1 p-6 overflow-auto">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
@@ -65,11 +80,18 @@ export function Lessons() {
             {isLoading ? (
               <div className="text-center py-12 text-slate-500">Загрузка...</div>
             ) : (
-              <LessonsTable
-                lessons={lessons}
-                onAttendance={setAttendanceLesson}
-                onDelete={setDeletingLesson}
-              />
+              <>
+                <LessonsTable
+                  lessons={lessons}
+                  onAttendance={setAttendanceLesson}
+                  onDelete={setDeletingLesson}
+                />
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                />
+              </>
             )}
           </div>
         </div>

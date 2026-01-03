@@ -275,9 +275,29 @@ const employeeQueries = {
   }
 };
 const clientQueries = {
-  getAll() {
+  getAll(filters) {
     const db2 = getDatabase();
-    return db2.prepare("SELECT * FROM clients ORDER BY full_name").all();
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const offset = (page - 1) * limit;
+    let whereClause = "WHERE 1=1";
+    const params = [];
+    if (filters?.searchQuery) {
+      whereClause += " AND (full_name LIKE ? OR phone LIKE ?)";
+      const searchPattern = `%${filters.searchQuery}%`;
+      params.push(searchPattern, searchPattern);
+    }
+    const countQuery = `SELECT COUNT(*) as total FROM clients ${whereClause}`;
+    const totalResult = db2.prepare(countQuery).get(...params);
+    const total = totalResult.total;
+    const dataQuery = `
+      SELECT * FROM clients 
+      ${whereClause}
+      ORDER BY full_name
+      LIMIT ? OFFSET ?
+    `;
+    const data = db2.prepare(dataQuery).all(...params, limit, offset);
+    return { data, total };
   },
   getById(id) {
     const db2 = getDatabase();
@@ -295,13 +315,27 @@ const clientQueries = {
       ORDER BY last_payment_date ASC
     `).all(daysSincePayment);
   },
-  search(query) {
+  search(query, filters) {
     const db2 = getDatabase();
-    return db2.prepare(`
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const offset = (page - 1) * limit;
+    const searchPattern = `%${query}%`;
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM clients 
+      WHERE full_name LIKE ? OR phone LIKE ?
+    `;
+    const totalResult = db2.prepare(countQuery).get(searchPattern, searchPattern);
+    const total = totalResult.total;
+    const dataQuery = `
       SELECT * FROM clients 
       WHERE full_name LIKE ? OR phone LIKE ?
       ORDER BY full_name
-    `).all(`%${query}%`, `%${query}%`);
+      LIMIT ? OFFSET ?
+    `;
+    const data = db2.prepare(dataQuery).all(searchPattern, searchPattern, limit, offset);
+    return { data, total };
   },
   create(data) {
     const db2 = getDatabase();
@@ -567,7 +601,33 @@ const groupQueries = {
 const lessonQueries = {
   getAll(filters) {
     const db2 = getDatabase();
-    let query = `
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 30;
+    const offset = (page - 1) * limit;
+    let whereClause = "WHERE 1=1";
+    const params = [];
+    if (filters?.groupId) {
+      whereClause += " AND l.group_id = ?";
+      params.push(filters.groupId);
+    }
+    if (filters?.startDate) {
+      whereClause += " AND l.lesson_date >= ?";
+      params.push(filters.startDate);
+    }
+    if (filters?.endDate) {
+      whereClause += " AND l.lesson_date <= ?";
+      params.push(filters.endDate);
+    }
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM lessons l
+      JOIN groups g ON l.group_id = g.id
+      LEFT JOIN employees e ON g.trainer_id = e.id
+      ${whereClause}
+    `;
+    const totalResult = db2.prepare(countQuery).get(...params);
+    const total = totalResult.total;
+    const dataQuery = `
       SELECT 
         l.*,
         g.name as group_name,
@@ -577,23 +637,12 @@ const lessonQueries = {
       FROM lessons l
       JOIN groups g ON l.group_id = g.id
       LEFT JOIN employees e ON g.trainer_id = e.id
-      WHERE 1=1
+      ${whereClause}
+      ORDER BY l.lesson_date ASC, l.start_time ASC
+      LIMIT ? OFFSET ?
     `;
-    const params = [];
-    if (filters?.groupId) {
-      query += " AND l.group_id = ?";
-      params.push(filters.groupId);
-    }
-    if (filters?.startDate) {
-      query += " AND l.lesson_date >= ?";
-      params.push(filters.startDate);
-    }
-    if (filters?.endDate) {
-      query += " AND l.lesson_date <= ?";
-      params.push(filters.endDate);
-    }
-    query += " ORDER BY l.lesson_date ASC, l.start_time ASC";
-    return db2.prepare(query).all(...params);
+    const data = db2.prepare(dataQuery).all(...params, limit, offset);
+    return { data, total };
   },
   getById(id) {
     const db2 = getDatabase();
@@ -712,7 +761,7 @@ const attendanceQueries = {
   getClientAttendance(clientId, startDate, endDate) {
     const db2 = getDatabase();
     let query = `
-      SELECT a.*, l.lesson_date, g.name as group_name
+      SELECT a.*, l.lesson_date, l.start_time, l.end_time, g.name as group_name
       FROM attendance a
       JOIN lessons l ON a.lesson_id = l.id
       JOIN groups g ON l.group_id = g.id
@@ -754,9 +803,9 @@ function setupIpcHandlers() {
   ipcMain.handle("db:employees:update", (_, id, data) => employeeQueries.update(id, data));
   ipcMain.handle("db:employees:delete", (_, id) => employeeQueries.delete(id));
   ipcMain.handle("auth:login", (_, login, password) => employeeQueries.authenticate(login, password));
-  ipcMain.handle("db:clients:getAll", () => clientQueries.getAll());
+  ipcMain.handle("db:clients:getAll", (_, filters) => clientQueries.getAll(filters));
   ipcMain.handle("db:clients:getById", (_, id) => clientQueries.getById(id));
-  ipcMain.handle("db:clients:search", (_, query) => clientQueries.search(query));
+  ipcMain.handle("db:clients:search", (_, query, filters) => clientQueries.search(query, filters));
   ipcMain.handle("db:clients:getDebtors", (_, days) => clientQueries.getDebtors(days));
   ipcMain.handle("db:clients:create", (_, data) => clientQueries.create(data));
   ipcMain.handle("db:clients:update", (_, id, data) => clientQueries.update(id, data));

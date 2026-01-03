@@ -7,11 +7,15 @@ interface ClientsState {
   debtors: Client[]
   isLoading: boolean
   searchQuery: string
+  totalCount: number
+  currentPage: number
+  pageSize: number
   
   fetchClients: () => Promise<void>
   fetchDebtors: (days?: number) => Promise<void>
   searchClients: (query: string) => Promise<void>
   setSearchQuery: (query: string) => void
+  setPage: (page: number) => void
   createClient: (data: any) => Promise<Client>
   updateClient: (id: number, data: any) => Promise<Client>
   updatePaymentDate: (id: number, date: string) => Promise<void>
@@ -23,13 +27,35 @@ export const useClientsStore = create<ClientsState>((set, get) => ({
   debtors: [],
   isLoading: false,
   searchQuery: '',
+  totalCount: 0,
+  currentPage: 1,
+  pageSize: 20,
 
   fetchClients: async () => {
     set({ isLoading: true })
     try {
-      const clients = await clientsApi.getAll() as Client[]
-      set({ clients, isLoading: false })
+      const state = get()
+      const result = await clientsApi.getAll({
+        page: state.currentPage,
+        limit: state.pageSize,
+        searchQuery: state.searchQuery
+      }) as { data: Client[]; total: number }
+      
+      if (result && typeof result === 'object' && 'data' in result && 'total' in result) {
+        set({ 
+          clients: result.data || [], 
+          totalCount: result.total || 0,
+          isLoading: false 
+        })
+      } else {
+        set({ 
+          clients: [], 
+          totalCount: 0,
+          isLoading: false 
+        })
+      }
     } catch (error) {
+      console.error('Error fetching clients:', error)
       set({ isLoading: false })
     }
   },
@@ -41,13 +67,32 @@ export const useClientsStore = create<ClientsState>((set, get) => ({
 
   searchClients: async (query: string) => {
     if (!query.trim()) {
+      set({ searchQuery: '', currentPage: 1 })
       return get().fetchClients()
     }
-    set({ isLoading: true })
+    set({ isLoading: true, searchQuery: query, currentPage: 1 })
     try {
-      const clients = await clientsApi.search(query) as Client[]
-      set({ clients, isLoading: false })
+      const state = get()
+      const result = await clientsApi.search(query, {
+        page: state.currentPage,
+        limit: state.pageSize
+      }) as { data: Client[]; total: number }
+      
+      if (result && typeof result === 'object' && 'data' in result && 'total' in result) {
+        set({ 
+          clients: result.data || [], 
+          totalCount: result.total || 0,
+          isLoading: false 
+        })
+      } else {
+        set({ 
+          clients: [], 
+          totalCount: 0,
+          isLoading: false 
+        })
+      }
     } catch (error) {
+      console.error('Error searching clients:', error)
       set({ isLoading: false })
     }
   },
@@ -56,9 +101,20 @@ export const useClientsStore = create<ClientsState>((set, get) => ({
     set({ searchQuery: query })
   },
 
+  setPage: (page: number) => {
+    set({ currentPage: page })
+    const state = get()
+    if (state.searchQuery.trim()) {
+      get().searchClients(state.searchQuery)
+    } else {
+      get().fetchClients()
+    }
+  },
+
   createClient: async (data) => {
     const client = await clientsApi.create(data) as Client
-    set((state) => ({ clients: [...state.clients, client] }))
+    set({ currentPage: 1 })
+    get().fetchClients()
     return client
   },
 
@@ -83,10 +139,19 @@ export const useClientsStore = create<ClientsState>((set, get) => ({
   deleteClient: async (id) => {
     const success = await clientsApi.delete(id) as boolean
     if (success) {
+      const state = get()
+      const remainingOnPage = state.clients.filter((c) => c.id !== id).length
+      
+      if (remainingOnPage === 0 && state.currentPage > 1) {
+        set({ currentPage: state.currentPage - 1 })
+      }
+      
       set((state) => ({
         clients: state.clients.filter((c) => c.id !== id),
         debtors: state.debtors.filter((c) => c.id !== id)
       }))
+      
+      get().fetchClients()
     }
     return success
   }
