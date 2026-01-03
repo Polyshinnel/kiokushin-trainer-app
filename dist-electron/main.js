@@ -592,7 +592,7 @@ const lessonQueries = {
       query += " AND l.lesson_date <= ?";
       params.push(filters.endDate);
     }
-    query += " ORDER BY l.lesson_date DESC, l.start_time ASC";
+    query += " ORDER BY l.lesson_date ASC, l.start_time ASC";
     return db2.prepare(query).all(...params);
   },
   getById(id) {
@@ -691,6 +691,8 @@ const attendanceQueries = {
       SELECT a.*, c.full_name as client_name, c.phone as client_phone
       FROM attendance a
       JOIN clients c ON a.client_id = c.id
+      JOIN lessons l ON a.lesson_id = l.id
+      JOIN group_members gm ON l.group_id = gm.group_id AND a.client_id = gm.client_id
       WHERE a.lesson_id = ?
       ORDER BY c.full_name
     `).all(lessonId);

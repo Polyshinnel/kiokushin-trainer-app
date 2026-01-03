@@ -30,7 +30,7 @@ export function getDayShortName(dayOfWeek: number): string {
 
 export function getAttendanceStatusText(status: string | null): string {
   switch (status) {
-    case 'present': return 'Был'
+    case 'present': return 'Присутствовал'
     case 'absent': return 'Отсутствовал'
     case 'sick': return 'Болеет'
     default: return 'Не отмечен'
