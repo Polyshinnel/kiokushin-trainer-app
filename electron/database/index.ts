@@ -31,3 +31,34 @@ export function closeDatabase(): void {
   }
 }
 
+export function optimizeDatabase(): void {
+  const database = getDatabase()
+  
+  database.pragma('optimize')
+  
+  database.exec('VACUUM')
+  
+  database.exec('ANALYZE')
+}
+
+export function getDatabaseStats(): {
+  size: number
+  tables: { name: string; rows: number }[]
+} {
+  const database = getDatabase()
+  
+  const tables = database.prepare(`
+    SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'
+  `).all() as { name: string }[]
+  
+  const tableStats = tables.map(t => {
+    const count = database.prepare(`SELECT COUNT(*) as count FROM ${t.name}`).get() as { count: number }
+    return { name: t.name, rows: count.count }
+  })
+  
+  return {
+    size: 0,
+    tables: tableStats
+  }
+}
+

@@ -13,7 +13,7 @@ interface EmployeesState {
   deleteEmployee: (id: number) => Promise<boolean>
 }
 
-export const useEmployeesStore = create<EmployeesState>((set, get) => ({
+export const useEmployeesStore = create<EmployeesState>((set) => ({
   employees: [],
   isLoading: false,
   error: null,
@@ -35,7 +35,21 @@ export const useEmployeesStore = create<EmployeesState>((set, get) => ({
   },
 
   updateEmployee: async (id, data) => {
-    const employee = await employeesApi.update(id, data) as Employee
+    const updateData: {
+      full_name?: string
+      birth_year?: number
+      phone?: string
+      login?: string
+      password?: string
+    } = {}
+    
+    if (data.full_name !== undefined) updateData.full_name = data.full_name
+    if (data.birth_year !== undefined && data.birth_year !== null) updateData.birth_year = data.birth_year
+    if (data.phone !== undefined && data.phone !== null) updateData.phone = data.phone
+    if (data.login !== undefined && data.login !== null) updateData.login = data.login
+    if (data.password !== undefined && data.password !== null) updateData.password = data.password
+    
+    const employee = await employeesApi.update(id, updateData) as Employee
     set((state) => ({
       employees: state.employees.map((e) => (e.id === id ? employee : e))
     }))

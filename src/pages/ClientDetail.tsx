@@ -41,7 +41,7 @@ export function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [clientData, setClientData] = useState<ClientWithParents | null>(null)
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [, setAttendance] = useState<AttendanceRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')

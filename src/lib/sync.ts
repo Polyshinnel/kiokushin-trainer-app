@@ -11,3 +11,4 @@ export async function getSyncStatus(): Promise<string> {
   return 'not_available'
 }
 
+

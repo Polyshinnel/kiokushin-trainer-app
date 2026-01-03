@@ -2,16 +2,23 @@
   "name": "train_schedule",
   "private": true,
   "version": "0.0.0",
+  "description": "Приложение для управления тренировками Kentos Dojo",
+  "author": "Kentos Dojo",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "vite",
     "electron:build": "npm run build && electron-builder",
-    "rebuild": "electron-rebuild"
+    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:linux": "npm run build && electron-builder --linux",
+    "rebuild": "electron-rebuild",
+    "postinstall": "electron-builder install-app-deps",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

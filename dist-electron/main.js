@@ -882,13 +882,68 @@ function createWindow() {
     show: false
   });
   mainWindow.once("ready-to-show", () => {
+    console.log("Window ready to show");
     mainWindow?.show();
+    mainWindow?.focus();
+  });
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error("Failed to load:", errorCode, errorDescription, validatedURL);
+    if (mainWindow) {
+      mainWindow.show();
+    }
+  });
+  mainWindow.webContents.on("did-finish-load", () => {
+    console.log("Page finished loading");
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
   });
   if (process.env.VITE_DEV_SERVER_URL) {
+    console.log("Loading dev server:", process.env.VITE_DEV_SERVER_URL);
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(path.join(__dirname$1, "../dist/index.html"));
+    const appPath = app.getAppPath();
+    const indexPath = path.join(appPath, "dist", "index.html");
+    console.log("App path:", appPath);
+    console.log("Loading file:", indexPath);
+    console.log("File exists:", existsSync(indexPath));
+    if (!existsSync(indexPath)) {
+      const altPath = path.join(__dirname$1, "../dist/index.html");
+      console.log("Trying alternative path:", altPath);
+      console.log("Alternative exists:", existsSync(altPath));
+      if (existsSync(altPath)) {
+        mainWindow.loadFile(altPath).catch((err) => {
+          console.error("Error loading alternative file:", err);
+          if (mainWindow) {
+            mainWindow.show();
+          }
+        });
+      } else {
+        console.error("index.html not found in both paths");
+        if (mainWindow) {
+          mainWindow.show();
+        }
+      }
+    } else {
+      mainWindow.loadFile(indexPath).catch((err) => {
+        console.error("Error loading file:", err);
+        if (mainWindow) {
+          mainWindow.show();
+        }
+      });
+    }
   }
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      console.log("Force showing window after timeout");
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 3e3);
 }
 app.whenReady().then(() => {
   initDatabase();

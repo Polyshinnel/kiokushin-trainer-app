@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { Group, Employee } from '@/types'
+import type { Group } from '@/types'
 import { useEmployeesStore } from '@/stores/employeesStore'
 
 interface GroupFormData {

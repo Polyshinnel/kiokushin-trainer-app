@@ -11,32 +11,35 @@ import { Lessons } from './pages/Lessons'
 import { Employees } from './pages/Employees'
 import { Settings } from './pages/Settings'
 import { Toaster } from './components/ui/toaster'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 export default function App() {
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route 
-          path="/" 
-          element={
-            <ProtectedRoute>
-              <MainLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="clients" element={<Clients />} />
-          <Route path="clients/:id" element={<ClientDetail />} />
-          <Route path="groups" element={<Groups />} />
-          <Route path="groups/:id" element={<GroupDetail />} />
-          <Route path="lessons" element={<Lessons />} />
-          <Route path="employees" element={<Employees />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <Toaster />
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="clients" element={<Clients />} />
+            <Route path="clients/:id" element={<ClientDetail />} />
+            <Route path="groups" element={<Groups />} />
+            <Route path="groups/:id" element={<GroupDetail />} />
+            <Route path="lessons" element={<Lessons />} />
+            <Route path="employees" element={<Employees />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <Toaster />
+      </HashRouter>
+    </ErrorBoundary>
   )
 }
