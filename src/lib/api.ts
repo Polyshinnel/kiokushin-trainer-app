@@ -1,9 +1,9 @@
 export const employeesApi = {
   getAll: () => window.electronAPI.db.query('employees:getAll'),
   getById: (id: number) => window.electronAPI.db.query('employees:getById', id),
-  create: (data: { full_name: string; birth_year?: number; phone?: string }) => 
+  create: (data: { full_name: string; birth_year?: number; phone?: string; login?: string; password?: string }) => 
     window.electronAPI.db.query('employees:create', data),
-  update: (id: number, data: { full_name?: string; birth_year?: number; phone?: string }) =>
+  update: (id: number, data: { full_name?: string; birth_year?: number; phone?: string; login?: string; password?: string }) =>
     window.electronAPI.db.query('employees:update', id, data),
   delete: (id: number) => window.electronAPI.db.query('employees:delete', id)
 }

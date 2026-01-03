@@ -5,6 +5,7 @@ import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Clients } from './pages/Clients'
 import { Groups } from './pages/Groups'
+import { GroupDetail } from './pages/GroupDetail'
 import { Lessons } from './pages/Lessons'
 import { Employees } from './pages/Employees'
 import { Settings } from './pages/Settings'
@@ -26,6 +27,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="clients" element={<Clients />} />
           <Route path="groups" element={<Groups />} />
+          <Route path="groups/:id" element={<GroupDetail />} />
           <Route path="lessons" element={<Lessons />} />
           <Route path="employees" element={<Employees />} />
           <Route path="settings" element={<Settings />} />

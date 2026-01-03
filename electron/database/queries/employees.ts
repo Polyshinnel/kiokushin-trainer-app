@@ -42,6 +42,7 @@ export const employeeQueries = {
 
   create(data: CreateEmployeeDto): Employee {
     const db = getDatabase()
+    const passwordHash = data.password ? createHash('sha256').update(data.password).digest('hex') : null
     const stmt = db.prepare(`
       INSERT INTO employees (full_name, birth_year, phone, login, password)
       VALUES (@full_name, @birth_year, @phone, @login, @password)
@@ -51,7 +52,7 @@ export const employeeQueries = {
       birth_year: data.birth_year ?? null,
       phone: data.phone ?? null,
       login: data.login ?? null,
-      password: data.password ?? null
+      password: passwordHash
     })
     return this.getById(result.lastInsertRowid as number)!
   },
@@ -79,7 +80,7 @@ export const employeeQueries = {
     }
     if (data.password !== undefined) {
       fields.push('password = @password')
-      values.password = data.password
+      values.password = data.password ? createHash('sha256').update(data.password).digest('hex') : null
     }
 
     if (fields.length === 0) return this.getById(id)
