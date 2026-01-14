@@ -156,6 +156,65 @@ const migrations: Migration[] = [
         console.log('Updated password for user: mishustin_r')
       }
     }
+  },
+  {
+    version: 3,
+    name: 'add_subscriptions',
+    up: (db: Database.Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          price REAL NOT NULL,
+          duration_days INTEGER NOT NULL,
+          visit_limit INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          sync_status TEXT DEFAULT 'pending'
+        );
+
+        CREATE TABLE IF NOT EXISTS client_subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          client_id INTEGER NOT NULL,
+          subscription_id INTEGER NOT NULL,
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          visits_used INTEGER DEFAULT 0,
+          visits_total INTEGER DEFAULT 0,
+          is_paid INTEGER DEFAULT 0,
+          payment_date DATE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          sync_status TEXT DEFAULT 'pending',
+          FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+          FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE RESTRICT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_client_subscriptions_client ON client_subscriptions(client_id);
+        CREATE INDEX IF NOT EXISTS idx_client_subscriptions_dates ON client_subscriptions(start_date, end_date);
+      `)
+
+      const result = db.prepare(`
+        INSERT INTO subscriptions (name, price, duration_days, visit_limit)
+        VALUES ('Все включено', 3500, 30, 0)
+      `).run()
+
+      const subscriptionId = result.lastInsertRowid
+
+      const today = new Date().toISOString().split('T')[0]
+      const endDate = new Date()
+      endDate.setDate(endDate.getDate() + 30)
+      const endDateStr = endDate.toISOString().split('T')[0]
+
+      db.prepare(`
+        INSERT INTO client_subscriptions (client_id, subscription_id, start_date, end_date, visits_total, is_paid)
+        SELECT id, ?, ?, ?, 0, 1
+        FROM clients
+      `).run(subscriptionId, today, endDateStr)
+
+      console.log('Migration 3: Added subscriptions and assigned to all clients')
+    }
   }
 ]
 

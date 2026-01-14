@@ -5,6 +5,7 @@ import { existsSync } from 'fs'
 import { initDatabase, closeDatabase } from './database'
 import { employeeQueries } from './database/queries/employees'
 import { clientQueries } from './database/queries/clients'
+import { subscriptionQueries } from './database/queries/subscriptions'
 import { groupQueries } from './database/queries/groups'
 import { lessonQueries, attendanceQueries } from './database/queries/lessons'
 
@@ -30,6 +31,25 @@ function setupIpcHandlers() {
   ipcMain.handle('db:clients:delete', (_, id) => clientQueries.delete(id))
   ipcMain.handle('db:clients:addParent', (_, clientId, data) => clientQueries.addParent(clientId, data))
   ipcMain.handle('db:clients:removeParent', (_, parentId) => clientQueries.removeParent(parentId))
+
+  ipcMain.handle('db:subscriptions:getAll', () => subscriptionQueries.getAll())
+  ipcMain.handle('db:subscriptions:getActive', () => subscriptionQueries.getActive())
+  ipcMain.handle('db:subscriptions:getById', (_, id) => subscriptionQueries.getById(id))
+  ipcMain.handle('db:subscriptions:create', (_, data) => subscriptionQueries.create(data))
+  ipcMain.handle('db:subscriptions:update', (_, id, data) => subscriptionQueries.update(id, data))
+  ipcMain.handle('db:subscriptions:delete', (_, id) => subscriptionQueries.delete(id))
+
+  ipcMain.handle('db:subscriptions:getClientSubscriptions', (_, clientId) => 
+    subscriptionQueries.getClientSubscriptions(clientId))
+  ipcMain.handle('db:subscriptions:getActiveClientSubscription', (_, clientId) => 
+    subscriptionQueries.getActiveClientSubscription(clientId))
+  ipcMain.handle('db:subscriptions:assign', (_, data) => subscriptionQueries.assignSubscription(data))
+  ipcMain.handle('db:subscriptions:markAsPaid', (_, id, date) => subscriptionQueries.markAsPaid(id, date))
+  ipcMain.handle('db:subscriptions:incrementVisit', (_, id) => subscriptionQueries.incrementVisit(id))
+  ipcMain.handle('db:subscriptions:removeClientSubscription', (_, id) => 
+    subscriptionQueries.removeClientSubscription(id))
+  ipcMain.handle('db:subscriptions:getUnpaid', () => subscriptionQueries.getUnpaidSubscriptions())
+  ipcMain.handle('db:subscriptions:getExpiring', (_, days) => subscriptionQueries.getExpiringSubscriptions(days))
 
   ipcMain.handle('db:groups:getAll', () => groupQueries.getAll())
   ipcMain.handle('db:groups:getById', (_, id) => groupQueries.getById(id))
