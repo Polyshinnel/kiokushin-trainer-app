@@ -6,18 +6,12 @@ import renderer from 'vite-plugin-electron-renderer'
 import path from 'path'
 import type { Plugin } from 'rollup'
 
-const removeExportPlugin = (): Plugin => ({
-  name: 'remove-export',
-  renderChunk(code, chunk) {
-    if (chunk.fileName === 'preload.cjs') {
-      return code.replace(/export default [^;]+;/g, 'require_preload();')
-    }
-    return null
-  },
+const cjsPreloadPlugin = (): Plugin => ({
+  name: 'preload-cjs-export',
   generateBundle(_, bundle) {
     const chunk = bundle['preload.cjs']
-    if (chunk && chunk.type === 'chunk') {
-      chunk.code = chunk.code.replace(/export default [^;]+;/g, 'require_preload();')
+    if (chunk && chunk.type === 'chunk' && typeof chunk.code === 'string') {
+      chunk.code = chunk.code.replace(/export default\s+([^;]+);?/, 'module.exports = $1;')
     }
   }
 })
@@ -57,7 +51,7 @@ export default defineConfig({
                 format: 'cjs',
                 entryFileNames: 'preload.cjs'
               },
-              plugins: [removeExportPlugin()]
+              plugins: [cjsPreloadPlugin()]
             }
           }
         }

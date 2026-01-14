@@ -31,7 +31,7 @@ export function Sidebar() {
       <div className="p-6 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <img 
-            src="/kyokushin-karate-seeklogo.png" 
+            src="kyokushin-karate-seeklogo.png" 
             alt="Kentos Dojo" 
             className="h-10 w-auto object-contain"
           />

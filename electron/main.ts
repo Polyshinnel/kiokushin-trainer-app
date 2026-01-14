@@ -101,19 +101,27 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 768,
+    center: true,
+    title: 'Kentos Dojo',
     webPreferences: {
       preload: path.resolve(preloadPath),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      devTools: false
     },
     titleBarStyle: 'default',
-    show: false
+    show: true
   })
+
+  mainWindow.webContents.openDevTools()
 
   mainWindow.once('ready-to-show', () => {
     console.log('Window ready to show')
-    mainWindow?.show()
-    mainWindow?.focus()
+    if (mainWindow) {
+      mainWindow.show()
+      mainWindow.focus()
+      mainWindow.moveTop()
+    }
   })
 
   mainWindow.on('closed', () => {
@@ -173,12 +181,21 @@ function createWindow() {
   }
 
   setTimeout(() => {
-    if (mainWindow && !mainWindow.isVisible()) {
+    if (mainWindow) {
       console.log('Force showing window after timeout')
-      mainWindow.show()
+      if (!mainWindow.isVisible()) {
+        mainWindow.show()
+      }
       mainWindow.focus()
+      mainWindow.moveTop()
+      mainWindow.setAlwaysOnTop(true)
+      setTimeout(() => {
+        if (mainWindow) {
+          mainWindow.setAlwaysOnTop(false)
+        }
+      }, 1000)
     }
-  }, 3000)
+  }, 2000)
 }
 
 app.whenReady().then(() => {

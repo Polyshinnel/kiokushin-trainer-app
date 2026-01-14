@@ -50,8 +50,8 @@ export function Login() {
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-lg">
         <div className="flex flex-col items-center mb-8">
           <img 
-            src="/kyokushin-karate-seeklogo.png" 
-            alt="Kyokushin Karate" 
+            src="kyokushin-karate-seeklogo.png" 
+            alt="Kyokushин Karate" 
             className="w-32 h-32 mb-4 object-contain"
           />
           <h1 className="text-2xl font-bold" style={{ color: '#0c194b', fontSize: '32px' }}>Вход в систему</h1>
