@@ -6,6 +6,7 @@ import {
   UsersRound,
   Calendar,
   UserCog,
+  CreditCard,
   Settings,
   LogOut
 } from 'lucide-react'
@@ -16,6 +17,7 @@ const navItems = [
   { title: 'Группы', path: '/groups', icon: UsersRound },
   { title: 'Занятия', path: '/lessons', icon: Calendar },
   { title: 'Сотрудники', path: '/employees', icon: UserCog },
+  { title: 'Абонементы', path: '/subscriptions', icon: CreditCard },
 ]
 
 export function Sidebar() {

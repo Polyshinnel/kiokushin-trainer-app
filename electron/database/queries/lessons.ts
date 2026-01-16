@@ -69,7 +69,7 @@ export const lessonQueries = {
         l.*,
         g.name as group_name,
         e.full_name as trainer_name,
-        (SELECT COUNT(*) FROM attendance WHERE lesson_id = l.id AND status IS NOT NULL) as attendance_count,
+        (SELECT COUNT(*) FROM attendance WHERE lesson_id = l.id AND status = 'present') as attendance_count,
         (SELECT COUNT(*) FROM group_members WHERE group_id = l.group_id) as total_members
       FROM lessons l
       JOIN groups g ON l.group_id = g.id
@@ -91,7 +91,7 @@ export const lessonQueries = {
         l.*,
         g.name as group_name,
         e.full_name as trainer_name,
-        (SELECT COUNT(*) FROM attendance WHERE lesson_id = l.id AND status IS NOT NULL) as attendance_count,
+        (SELECT COUNT(*) FROM attendance WHERE lesson_id = l.id AND status = 'present') as attendance_count,
         (SELECT COUNT(*) FROM group_members WHERE group_id = l.group_id) as total_members
       FROM lessons l
       JOIN groups g ON l.group_id = g.id
@@ -193,6 +193,82 @@ export const lessonQueries = {
     const db = getDatabase()
     const result = db.prepare('DELETE FROM lessons WHERE id = ?').run(id)
     return result.changes > 0
+  },
+
+  /**
+   * Получить занятия группы за указанный месяц
+   */
+  getByGroupAndMonth(groupId: number, year: number, month: number): LessonWithDetails[] {
+    const db = getDatabase()
+    
+    // Формируем даты начала и конца месяца
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month, 0).getDate()
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    
+    return db.prepare(`
+      SELECT 
+        l.*,
+        g.name as group_name,
+        e.full_name as trainer_name,
+        (SELECT COUNT(*) FROM attendance WHERE lesson_id = l.id AND status = 'present') as attendance_count,
+        (SELECT COUNT(*) FROM group_members WHERE group_id = l.group_id) as total_members
+      FROM lessons l
+      JOIN groups g ON l.group_id = g.id
+      LEFT JOIN employees e ON g.trainer_id = e.id
+      WHERE l.group_id = ? AND l.lesson_date BETWEEN ? AND ?
+      ORDER BY l.lesson_date ASC, l.start_time ASC
+    `).all(groupId, startDate, endDate) as LessonWithDetails[]
+  },
+
+  /**
+   * Получить полную матрицу посещаемости группы за месяц
+   * Возвращает: { lessons: [], members: [], attendance: { lessonId: { clientId: status } } }
+   */
+  getGroupAttendanceMatrix(groupId: number, year: number, month: number): {
+    lessons: LessonWithDetails[]
+    members: { client_id: number; client_name: string; client_phone: string | null }[]
+    attendance: Record<number, Record<number, 'present' | 'absent' | 'sick' | null>>
+  } {
+    const db = getDatabase()
+    
+    // Получаем занятия за месяц
+    const lessons = this.getByGroupAndMonth(groupId, year, month)
+    
+    // Получаем участников группы
+    const members = db.prepare(`
+      SELECT gm.client_id, c.full_name as client_name, c.phone as client_phone
+      FROM group_members gm
+      JOIN clients c ON c.id = gm.client_id
+      WHERE gm.group_id = ?
+      ORDER BY c.full_name
+    `).all(groupId) as { client_id: number; client_name: string; client_phone: string | null }[]
+    
+    // Получаем все записи посещаемости за эти занятия
+    const lessonIds = lessons.map(l => l.id)
+    
+    if (lessonIds.length === 0) {
+      return { lessons, members, attendance: {} }
+    }
+    
+    const placeholders = lessonIds.map(() => '?').join(',')
+    const attendanceRecords = db.prepare(`
+      SELECT lesson_id, client_id, status
+      FROM attendance
+      WHERE lesson_id IN (${placeholders})
+    `).all(...lessonIds) as { lesson_id: number; client_id: number; status: 'present' | 'absent' | 'sick' | null }[]
+    
+    // Формируем матрицу посещаемости
+    const attendance: Record<number, Record<number, 'present' | 'absent' | 'sick' | null>> = {}
+    
+    for (const record of attendanceRecords) {
+      if (!attendance[record.lesson_id]) {
+        attendance[record.lesson_id] = {}
+      }
+      attendance[record.lesson_id][record.client_id] = record.status
+    }
+    
+    return { lessons, members, attendance }
   }
 }
 

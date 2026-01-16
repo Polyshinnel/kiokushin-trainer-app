@@ -160,7 +160,11 @@ export const subscriptionQueries = {
         AND cs.end_date >= date('now')
         AND cs.start_date <= date('now')
         AND (cs.visits_total = 0 OR cs.visits_used < cs.visits_total)
-      ORDER BY cs.end_date ASC
+      ORDER BY 
+        CASE WHEN cs.is_paid = 1 THEN 0 ELSE 1 END,
+        CASE WHEN cs.visits_total > 0 THEN 0 ELSE 1 END,
+        cs.end_date ASC,
+        cs.start_date DESC
       LIMIT 1
     `).get(clientId) as ClientSubscription | undefined
   },

@@ -28,6 +28,7 @@ export function Dashboard() {
             <TodayLessons />
             <Debtors />
           </div>
+          
         </div>
       </div>
     </div>

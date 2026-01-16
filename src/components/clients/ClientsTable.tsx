@@ -23,6 +23,11 @@ interface ClientsTableProps {
 export function ClientsTable({ clients, onEdit, onDelete, onPayment }: ClientsTableProps) {
   const navigate = useNavigate()
   const isDebtor = (client: Client) => {
+    if (client.current_subscription_status) {
+      return client.current_subscription_status === 'unpaid' 
+        || client.current_subscription_status === 'expired' 
+        || client.current_subscription_status === 'none'
+    }
     if (!client.last_payment_date) return true
     const paymentDate = new Date(client.last_payment_date)
     const thirtyDaysAgo = new Date()
@@ -45,7 +50,7 @@ export function ClientsTable({ clients, onEdit, onDelete, onPayment }: ClientsTa
           <TableHead className="w-[250px]">ФИО</TableHead>
           <TableHead>Возраст</TableHead>
           <TableHead>Телефон</TableHead>
-          <TableHead>Последняя оплата</TableHead>
+          <TableHead>Абонемент</TableHead>
           <TableHead className="text-right">Действия</TableHead>
         </TableRow>
       </TableHeader>
@@ -60,13 +65,24 @@ export function ClientsTable({ clients, onEdit, onDelete, onPayment }: ClientsTa
                 )}
               </div>
             </TableCell>
-            <TableCell>{calculateAge(client.birth_year)}</TableCell>
+            <TableCell>{calculateAge(client.birth_date ?? client.birth_year)}</TableCell>
             <TableCell>{formatPhone(client.phone)}</TableCell>
             <TableCell>
-              {client.last_payment_date 
-                ? formatDate(client.last_payment_date)
-                : <span className="text-slate-400">Не оплачено</span>
-              }
+              <div className="flex flex-col">
+                <span className="font-medium">
+                  {client.current_subscription_name || 'Не назначен'}
+                </span>
+                <span className="text-xs text-slate-500">
+                  {client.current_subscription_end_date 
+                    ? `до ${formatDate(client.current_subscription_end_date)}`
+                    : 'без даты'}
+                </span>
+                {client.current_subscription_status && client.current_subscription_status !== 'paid' && (
+                  <Badge variant="destructive" className="mt-1 w-fit text-xs">
+                    Не оплачен
+                  </Badge>
+                )}
+              </div>
             </TableCell>
             <TableCell className="text-right">
               <div className="flex justify-end gap-1">

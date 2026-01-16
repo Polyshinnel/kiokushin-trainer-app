@@ -2,8 +2,10 @@ import type { Group } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, User, Pencil, Trash2, ChevronRight } from 'lucide-react'
+import { Users, User, Pencil, Trash2, ChevronRight, Calendar } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { GroupCalendarDialog } from './GroupCalendarDialog'
 
 interface GroupsListProps {
   groups: Group[]
@@ -13,6 +15,7 @@ interface GroupsListProps {
 
 export function GroupsList({ groups, onEdit, onDelete }: GroupsListProps) {
   const navigate = useNavigate()
+  const [calendarGroup, setCalendarGroup] = useState<Group | null>(null)
 
   if (groups.length === 0) {
     return (
@@ -25,31 +28,41 @@ export function GroupsList({ groups, onEdit, onDelete }: GroupsListProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {groups.map((group) => (
-        <Card 
-          key={group.id} 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => navigate(`/groups/${group.id}`)}
-        >
-          <CardHeader className="pb-2">
-            <div className="flex items-start justify-between">
-              <CardTitle className="text-lg">{group.name}</CardTitle>
-              <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" onClick={() => onEdit(group)}>
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="text-red-500 hover:text-red-600"
-                  onClick={() => onDelete(group)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {groups.map((group) => (
+          <Card 
+            key={group.id} 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate(`/groups/${group.id}`)}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex items-start justify-between">
+                <CardTitle className="text-lg">{group.name}</CardTitle>
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                  {/* Кнопка календаря */}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setCalendarGroup(group)}
+                    title="Календарь посещаемости"
+                  >
+                    <Calendar className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => onEdit(group)}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="text-red-500 hover:text-red-600"
+                    onClick={() => onDelete(group)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardHeader>
+            </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 text-sm text-slate-600">
               <div className="flex items-center gap-1">
@@ -73,7 +86,15 @@ export function GroupsList({ groups, onEdit, onDelete }: GroupsListProps) {
           </CardContent>
         </Card>
       ))}
-    </div>
+      </div>
+
+      {/* Диалог календаря */}
+      <GroupCalendarDialog
+        open={!!calendarGroup}
+        onOpenChange={(open) => !open && setCalendarGroup(null)}
+        group={calendarGroup}
+      />
+    </>
   )
 }
 

@@ -6,16 +6,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft } from 'lucide-react'
-import { clientsApi, attendanceApi } from '@/lib/api'
+import { ArrowLeft, Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import { clientsApi, attendanceApi, subscriptionsApi } from '@/lib/api'
 import { calculateAge, formatPhone, formatDate } from '@/lib/utils'
+import { ClientSubscriptionCard } from '@/components/subscriptions/ClientSubscriptionCard'
+import { AssignSubscriptionDialog } from '@/components/subscriptions/AssignSubscriptionDialog'
+import type { ClientSubscription } from '@/types'
 
 interface ClientWithParents {
   id: number
   full_name: string
+  birth_date: string | null
   birth_year: number | null
   phone: string | null
   last_payment_date: string | null
+  doc_type: 'passport' | 'certificate' | null
+  doc_series: string | null
+  doc_number: string | null
+  doc_issued_by: string | null
+  doc_issued_date: string | null
+  home_address: string | null
+  workplace: string | null
   created_at: string
   updated_at: string
   sync_status: string
@@ -47,13 +59,43 @@ export function ClientDetail() {
   const [endDate, setEndDate] = useState('')
   const [totalHours, setTotalHours] = useState(0)
   const [lastVisitDate, setLastVisitDate] = useState<string | null>(null)
+  const [clientSubscriptions, setClientSubscriptions] = useState<ClientSubscription[]>([])
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
+  const currentSubscription = clientSubscriptions.length > 0 ? clientSubscriptions[0] : null
 
   useEffect(() => {
     if (id) {
       loadClientData()
       loadLastVisit()
+      loadClientSubscriptions()
     }
   }, [id])
+
+  const loadClientSubscriptions = async () => {
+    if (!id) return
+    try {
+      const data = await subscriptionsApi.getClientSubscriptions(parseInt(id))
+      setClientSubscriptions(data as ClientSubscription[])
+    } catch (error) {
+      console.error('Error loading client subscriptions:', error)
+    }
+  }
+
+  const handleMarkPaid = async (subscriptionId: number) => {
+    try {
+      await subscriptionsApi.markAsPaid(subscriptionId)
+      await loadClientSubscriptions()
+      toast.success('Оплата отмечена')
+    } catch (error) {
+      console.error('Error marking subscription as paid:', error)
+      toast.error('Ошибка при отметке оплаты')
+    }
+  }
+
+  const handleSubscriptionAssigned = async () => {
+    await loadClientSubscriptions()
+    toast.success('Абонемент назначен')
+  }
 
   useEffect(() => {
     if (id && (startDate || endDate)) {
@@ -124,17 +166,19 @@ export function ClientDetail() {
   }
 
   const getPaymentStatus = () => {
-    if (!clientData?.last_payment_date) {
-      return { text: 'Не оплачено', variant: 'destructive' as const }
+    if (!currentSubscription) {
+      return { text: 'Не оплачен', variant: 'destructive' as const }
     }
-    const paymentDate = new Date(clientData.last_payment_date)
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    
-    if (paymentDate < thirtyDaysAgo) {
-      return { text: 'Просрочено', variant: 'destructive' as const }
+
+    const end = new Date(currentSubscription.end_date)
+    const outOfVisits = currentSubscription.visits_total > 0 
+      && currentSubscription.visits_used >= currentSubscription.visits_total
+
+    if (!currentSubscription.is_paid || end < new Date() || outOfVisits) {
+      return { text: 'Не оплачен', variant: 'destructive' as const }
     }
-    return { text: 'Оплачено', variant: 'default' as const }
+
+    return { text: 'Оплачен', variant: 'default' as const }
   }
 
   if (isLoading) {
@@ -177,7 +221,11 @@ export function ClientDetail() {
               </div>
               <div>
                 <Label className="text-slate-500 text-xs">Возраст</Label>
-                <p className="font-medium">{calculateAge(clientData.birth_year)}</p>
+                <p className="font-medium">{calculateAge(clientData.birth_date ?? clientData.birth_year)}</p>
+              </div>
+              <div>
+                <Label className="text-slate-500 text-xs">Дата рождения</Label>
+                <p className="font-medium">{clientData.birth_date ? formatDate(clientData.birth_date) : 'Не указана'}</p>
               </div>
               <div>
                 <Label className="text-slate-500 text-xs">Телефон</Label>
@@ -201,15 +249,73 @@ export function ClientDetail() {
                   <Badge variant={paymentStatus.variant}>{paymentStatus.text}</Badge>
                 </div>
               </div>
-              {clientData.last_payment_date && (
-                <div>
-                  <Label className="text-slate-500 text-xs">Последняя оплата</Label>
-                  <p className="font-medium">{formatDate(clientData.last_payment_date)}</p>
+              <div>
+                <Label className="text-slate-500 text-xs">Абонемент</Label>
+                <p className="font-medium">
+                  {currentSubscription ? currentSubscription.subscription_name : 'Не назначен'}
+                </p>
+              </div>
+              {currentSubscription && (
+                <div className="space-y-1 text-sm">
+                  <p className="flex justify-between">
+                    <span className="text-slate-500">Период:</span>
+                    <span className="font-medium">
+                      {formatDate(currentSubscription.start_date)} — {formatDate(currentSubscription.end_date)}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-slate-500">Посещений:</span>
+                    <span className="font-medium">
+                      {currentSubscription.visits_total === 0
+                        ? 'Безлимит'
+                        : `${currentSubscription.visits_used} / ${currentSubscription.visits_total}`}
+                    </span>
+                  </p>
                 </div>
               )}
               <div>
                 <Label className="text-slate-500 text-xs">Дата последнего посещения</Label>
                 <p className="font-medium">{lastVisitDate ? formatDate(lastVisitDate) : 'Нет посещений'}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-lg">Документы и адрес</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-500 text-xs">Тип документа</Label>
+                <p className="font-medium">
+                  {clientData.doc_type === 'passport' && 'Паспорт'}
+                  {clientData.doc_type === 'certificate' && 'Свидетельство'}
+                  {!clientData.doc_type && 'Не указан'}
+                </p>
+              </div>
+              <div>
+                <Label className="text-slate-500 text-xs">Серия и номер</Label>
+                <p className="font-medium">
+                  {clientData.doc_series || clientData.doc_number
+                    ? `${clientData.doc_series ?? ''} ${clientData.doc_number ?? ''}`.trim()
+                    : 'Не указаны'}
+                </p>
+              </div>
+              <div>
+                <Label className="text-slate-500 text-xs">Кем выдан</Label>
+                <p className="font-medium">{clientData.doc_issued_by || 'Не указано'}</p>
+              </div>
+              <div>
+                <Label className="text-slate-500 text-xs">Дата выдачи</Label>
+                <p className="font-medium">{clientData.doc_issued_date ? formatDate(clientData.doc_issued_date) : 'Не указана'}</p>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-slate-500 text-xs">Домашний адрес</Label>
+                <p className="font-medium">{clientData.home_address || 'Не указан'}</p>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-slate-500 text-xs">Место работы/учёбы</Label>
+                <p className="font-medium">{clientData.workplace || 'Не указано'}</p>
               </div>
             </CardContent>
           </Card>
@@ -271,7 +377,43 @@ export function ClientDetail() {
               )}
             </CardContent>
           </Card>
+
+          <div className="lg:col-span-2 mt-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Абонементы</h2>
+              <Button 
+                size="sm" 
+                onClick={() => setIsAssignDialogOpen(true)}
+                style={{ backgroundColor: '#0c194b', color: '#fff' }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Назначить
+              </Button>
+            </div>
+            
+            {clientSubscriptions.length === 0 ? (
+              <p className="text-slate-500">Нет абонементов</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {clientSubscriptions.map((sub) => (
+                  <ClientSubscriptionCard 
+                    key={sub.id} 
+                    subscription={sub} 
+                    onMarkPaid={handleMarkPaid}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
+        <AssignSubscriptionDialog
+          open={isAssignDialogOpen}
+          onOpenChange={setIsAssignDialogOpen}
+          clientId={clientData.id}
+          clientName={clientData.full_name}
+          onSuccess={handleSubscriptionAssigned}
+        />
       </div>
     </div>
   )

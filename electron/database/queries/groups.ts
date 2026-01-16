@@ -225,15 +225,37 @@ export const groupQueries = {
 
   addMember(groupId: number, clientId: number): GroupMember {
     const db = getDatabase()
-    const result = db.prepare(`
-      INSERT INTO group_members (group_id, client_id)
-      VALUES (?, ?)
-    `).run(groupId, clientId)
-    
-    db.prepare("UPDATE groups SET sync_status = 'pending' WHERE id = ?").run(groupId)
-    
-    return db.prepare('SELECT * FROM group_members WHERE id = ?')
-      .get(result.lastInsertRowid) as GroupMember
+    const addMemberTx = db.transaction(() => {
+      const insertResult = db.prepare(`
+        INSERT INTO group_members (group_id, client_id)
+        VALUES (?, ?)
+      `).run(groupId, clientId)
+
+      const memberId = insertResult.lastInsertRowid as number
+      const member = db.prepare('SELECT * FROM group_members WHERE id = ?')
+        .get(memberId) as GroupMember
+
+      const lessons = db.prepare(`
+        SELECT id 
+        FROM lessons 
+        WHERE group_id = ? AND lesson_date >= ?
+      `).all(groupId, member.joined_at) as { id: number }[]
+
+      const attendanceStmt = db.prepare(`
+        INSERT OR IGNORE INTO attendance (lesson_id, client_id, status)
+        VALUES (?, ?, NULL)
+      `)
+
+      for (const lesson of lessons) {
+        attendanceStmt.run(lesson.id, clientId)
+      }
+
+      db.prepare("UPDATE groups SET sync_status = 'pending' WHERE id = ?").run(groupId)
+
+      return member
+    })
+
+    return addMemberTx()
   },
 
   removeMember(groupId: number, clientId: number): boolean {

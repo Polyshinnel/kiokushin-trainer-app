@@ -71,6 +71,12 @@ function setupIpcHandlers() {
   ipcMain.handle('db:lessons:generateFromSchedule', (_, groupId, startDate, endDate) => 
     lessonQueries.generateFromSchedule(groupId, startDate, endDate))
   ipcMain.handle('db:lessons:delete', (_, id) => lessonQueries.delete(id))
+  
+  // Calendar attendance
+  ipcMain.handle('db:lessons:getByGroupAndMonth', (_, groupId, year, month) => 
+    lessonQueries.getByGroupAndMonth(groupId, year, month))
+  ipcMain.handle('db:lessons:getGroupAttendanceMatrix', (_, groupId, year, month) => 
+    lessonQueries.getGroupAttendanceMatrix(groupId, year, month))
 
   ipcMain.handle('db:attendance:getByLesson', (_, lessonId) => attendanceQueries.getByLesson(lessonId))
   ipcMain.handle('db:attendance:updateStatus', (_, lessonId, clientId, status) => 

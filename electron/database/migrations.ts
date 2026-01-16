@@ -28,8 +28,16 @@ const migrations: Migration[] = [
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         full_name TEXT NOT NULL,
         birth_year INTEGER,
+        birth_date DATE,
         phone TEXT,
         last_payment_date DATE,
+        doc_type TEXT CHECK (doc_type IN ('passport', 'certificate') OR doc_type IS NULL),
+        doc_series TEXT,
+        doc_number TEXT,
+        doc_issued_by TEXT,
+        doc_issued_date DATE,
+        home_address TEXT,
+        workplace TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         sync_status TEXT DEFAULT 'pending'
@@ -214,6 +222,49 @@ const migrations: Migration[] = [
       `).run(subscriptionId, today, endDateStr)
 
       console.log('Migration 3: Added subscriptions and assigned to all clients')
+    }
+  }
+  ,{
+    version: 4,
+    name: 'add_client_documents_and_birth_date',
+    up: (db: Database.Database) => {
+      const columns = db.prepare(`PRAGMA table_info(clients)`).all() as { name: string }[]
+      const hasColumn = (name: string) => columns.some(col => col.name === name)
+
+      if (!hasColumn('birth_date')) {
+        db.exec(`ALTER TABLE clients ADD COLUMN birth_date DATE;`)
+      }
+      if (!hasColumn('doc_type')) {
+        db.exec(`ALTER TABLE clients ADD COLUMN doc_type TEXT CHECK (doc_type IN ('passport', 'certificate') OR doc_type IS NULL);`)
+      }
+      if (!hasColumn('doc_series')) {
+        db.exec(`ALTER TABLE clients ADD COLUMN doc_series TEXT;`)
+      }
+      if (!hasColumn('doc_number')) {
+        db.exec(`ALTER TABLE clients ADD COLUMN doc_number TEXT;`)
+      }
+      if (!hasColumn('doc_issued_by')) {
+        db.exec(`ALTER TABLE clients ADD COLUMN doc_issued_by TEXT;`)
+      }
+      if (!hasColumn('doc_issued_date')) {
+        db.exec(`ALTER TABLE clients ADD COLUMN doc_issued_date DATE;`)
+      }
+      if (!hasColumn('home_address')) {
+        db.exec(`ALTER TABLE clients ADD COLUMN home_address TEXT;`)
+      }
+      if (!hasColumn('workplace')) {
+        db.exec(`ALTER TABLE clients ADD COLUMN workplace TEXT;`)
+      }
+    }
+  },
+  {
+    version: 5,
+    name: 'add_lessons_group_date_index',
+    up: (db: Database.Database) => {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_lessons_group_date ON lessons(group_id, lesson_date);
+      `)
+      console.log('Migration 5: Added index for lessons(group_id, lesson_date)')
     }
   }
 ]

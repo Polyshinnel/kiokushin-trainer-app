@@ -7,6 +7,7 @@ interface ClientsState {
   debtors: Client[]
   isLoading: boolean
   searchQuery: string
+  subscriptionFilter: 'all' | 'active' | 'expired' | 'unpaid'
   totalCount: number
   currentPage: number
   pageSize: number
@@ -15,6 +16,7 @@ interface ClientsState {
   fetchDebtors: (days?: number) => Promise<void>
   searchClients: (query: string) => Promise<void>
   setSearchQuery: (query: string) => void
+  setSubscriptionFilter: (filter: 'all' | 'active' | 'expired' | 'unpaid') => void
   setPage: (page: number) => void
   createClient: (data: any) => Promise<Client>
   updateClient: (id: number, data: any) => Promise<Client>
@@ -27,6 +29,7 @@ export const useClientsStore = create<ClientsState>((set, get) => ({
   debtors: [],
   isLoading: false,
   searchQuery: '',
+  subscriptionFilter: 'all',
   totalCount: 0,
   currentPage: 1,
   pageSize: 20,
@@ -35,11 +38,15 @@ export const useClientsStore = create<ClientsState>((set, get) => ({
     set({ isLoading: true })
     try {
       const state = get()
-      const result = await clientsApi.getAll({
+      const filters: any = {
         page: state.currentPage,
         limit: state.pageSize,
         searchQuery: state.searchQuery
-      }) as { data: Client[]; total: number }
+      }
+      if (state.subscriptionFilter !== 'all') {
+        filters.subscriptionStatus = state.subscriptionFilter
+      }
+      const result = await clientsApi.getAll(filters) as { data: Client[]; total: number }
       
       if (result && typeof result === 'object' && 'data' in result && 'total' in result) {
         set({ 
@@ -73,10 +80,14 @@ export const useClientsStore = create<ClientsState>((set, get) => ({
     set({ isLoading: true, searchQuery: query, currentPage: 1 })
     try {
       const state = get()
-      const result = await clientsApi.search(query, {
+      const filters: any = {
         page: state.currentPage,
         limit: state.pageSize
-      }) as { data: Client[]; total: number }
+      }
+      if (state.subscriptionFilter !== 'all') {
+        filters.subscriptionStatus = state.subscriptionFilter
+      }
+      const result = await clientsApi.search(query, filters) as { data: Client[]; total: number }
       
       if (result && typeof result === 'object' && 'data' in result && 'total' in result) {
         set({ 
@@ -99,6 +110,16 @@ export const useClientsStore = create<ClientsState>((set, get) => ({
 
   setSearchQuery: (query: string) => {
     set({ searchQuery: query })
+  },
+
+  setSubscriptionFilter: (filter: 'all' | 'active' | 'expired' | 'unpaid') => {
+    set({ subscriptionFilter: filter, currentPage: 1 })
+    const state = get()
+    if (state.searchQuery.trim()) {
+      get().searchClients(state.searchQuery)
+    } else {
+      get().fetchClients()
+    }
   },
 
   setPage: (page: number) => {

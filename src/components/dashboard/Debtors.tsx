@@ -5,18 +5,26 @@ import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, CreditCard, ChevronRight, Phone } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useClientsStore } from '@/stores/clientsStore'
+import { subscriptionsApi } from '@/lib/api'
 
 export function Debtors() {
   const navigate = useNavigate()
-  const { debtors, fetchDebtors, updatePaymentDate } = useClientsStore()
+  const { debtors, fetchDebtors } = useClientsStore()
 
   useEffect(() => {
     fetchDebtors()
   }, [fetchDebtors])
 
-  const handlePayment = async (clientId: number) => {
+  const handlePayment = async (clientId: number, subscriptionTypeId?: number | null) => {
     const today = new Date().toISOString().split('T')[0]
-    await updatePaymentDate(clientId, today)
+    if (!subscriptionTypeId) return
+    await subscriptionsApi.assign({
+      client_id: clientId,
+      subscription_id: subscriptionTypeId,
+      start_date: today,
+      is_paid: true
+    })
+    await fetchDebtors()
   }
 
   return (
@@ -44,9 +52,10 @@ export function Debtors() {
         ) : (
           <div className="space-y-3 max-h-[300px] overflow-y-auto">
             {debtors.slice(0, 10).map((client) => {
-              const daysSincePayment = client.last_payment_date
-                ? Math.floor((Date.now() - new Date(client.last_payment_date).getTime()) / (1000 * 60 * 60 * 24))
-                : null
+              const hasSubscription = !!client.current_subscription_id
+              const visitsTotal = client.current_subscription_visits_total ?? 0
+              const visitsUsed = client.current_subscription_visits_used ?? 0
+              const visitsText = visitsTotal > 0 ? `${visitsUsed} / ${visitsTotal}` : 'Безлимит'
 
               return (
                 <div
@@ -55,26 +64,35 @@ export function Debtors() {
                 >
                   <div>
                     <p className="font-medium">{client.full_name}</p>
-                    <div className="flex items-center gap-3 text-sm text-slate-500">
-                      {client.phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {client.phone}
+                    <div className="flex flex-col gap-1 text-sm text-slate-600">
+                      <div className="flex items-center gap-3">
+                        {client.phone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {client.phone}
+                          </span>
+                        )}
+                        <span>
+                          {hasSubscription
+                            ? client.current_subscription_name
+                            : 'Нет абонемента'}
                         </span>
+                      </div>
+                      {hasSubscription && (
+                        <>
+                          <span>
+                            Срок: {client.current_subscription_start_date} — {client.current_subscription_end_date}
+                          </span>
+                          <span>Посещено: {visitsText}</span>
+                        </>
                       )}
-                      <span>
-                        {client.last_payment_date
-                          ? `${daysSincePayment} дн. назад`
-                          : 'Никогда не платил'
-                        }
-                      </span>
                     </div>
                   </div>
                   
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handlePayment(client.id)}
+                    onClick={() => handlePayment(client.id, (client as any).current_subscription_type_id)}
                   >
                     <CreditCard className="w-4 h-4 mr-1" />
                     Оплатил
@@ -94,6 +112,7 @@ export function Debtors() {
     </Card>
   )
 }
+
 
 
 

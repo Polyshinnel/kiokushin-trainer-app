@@ -49,7 +49,15 @@ export const lessonsApi = {
   create: (data: any) => window.electronAPI.db.query('lessons:create', data),
   generateFromSchedule: (groupId: number, startDate: string, endDate: string) =>
     window.electronAPI.db.query('lessons:generateFromSchedule', groupId, startDate, endDate),
-  delete: (id: number) => window.electronAPI.db.query('lessons:delete', id)
+  delete: (id: number) => window.electronAPI.db.query('lessons:delete', id),
+  
+  // Получить занятия группы за месяц
+  getByGroupAndMonth: (groupId: number, year: number, month: number) =>
+    window.electronAPI.db.query('lessons:getByGroupAndMonth', groupId, year, month),
+  
+  // Получить матрицу посещаемости группы за месяц
+  getGroupAttendanceMatrix: (groupId: number, year: number, month: number) =>
+    window.electronAPI.db.query('lessons:getGroupAttendanceMatrix', groupId, year, month)
 }
 
 export const attendanceApi = {
@@ -68,5 +76,28 @@ export const authApi = {
     }
     return window.electronAPI.auth.login(login, password)
   }
+}
+
+export const subscriptionsApi = {
+  getAll: () => window.electronAPI.db.query('subscriptions:getAll'),
+  getActive: () => window.electronAPI.db.query('subscriptions:getActive'),
+  getById: (id: number) => window.electronAPI.db.query('subscriptions:getById', id),
+  create: (data: any) => window.electronAPI.db.query('subscriptions:create', data),
+  update: (id: number, data: any) => window.electronAPI.db.query('subscriptions:update', id, data),
+  delete: (id: number) => window.electronAPI.db.query('subscriptions:delete', id),
+  
+  // Client subscriptions
+  getClientSubscriptions: (clientId: number) => 
+    window.electronAPI.db.query('subscriptions:getClientSubscriptions', clientId),
+  getActiveClientSubscription: (clientId: number) => 
+    window.electronAPI.db.query('subscriptions:getActiveClientSubscription', clientId),
+  assign: (data: any) => window.electronAPI.db.query('subscriptions:assign', data),
+  markAsPaid: (id: number, date?: string) => 
+    window.electronAPI.db.query('subscriptions:markAsPaid', id, date),
+  incrementVisit: (id: number) => window.electronAPI.db.query('subscriptions:incrementVisit', id),
+  removeClientSubscription: (id: number) => 
+    window.electronAPI.db.query('subscriptions:removeClientSubscription', id),
+  getUnpaid: () => window.electronAPI.db.query('subscriptions:getUnpaid'),
+  getExpiring: (days?: number) => window.electronAPI.db.query('subscriptions:getExpiring', days)
 }
 

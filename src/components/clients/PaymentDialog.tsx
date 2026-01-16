@@ -59,7 +59,7 @@ export function PaymentDialog({ open, onOpenChange, client, onConfirm }: Payment
           </p>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Дата оплаты</label>
+            <label className="text-sm font-medium">Дата начала периода</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button

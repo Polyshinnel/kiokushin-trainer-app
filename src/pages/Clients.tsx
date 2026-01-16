@@ -9,16 +9,17 @@ import { PaymentDialog } from '@/components/clients/PaymentDialog'
 import { DeleteConfirmDialog } from '@/components/shared/DeleteConfirmDialog'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { Pagination } from '@/components/shared/Pagination'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { clientsApi } from '@/lib/api'
+import { clientsApi, subscriptionsApi } from '@/lib/api'
 import type { Client } from '@/types'
 
 export function Clients() {
   const { 
-    clients, isLoading, searchQuery,
+    clients, isLoading, searchQuery, subscriptionFilter,
     totalCount, currentPage, pageSize,
-    fetchClients, searchClients, setSearchQuery, setPage,
-    createClient, updateClient, updatePaymentDate, deleteClient 
+    fetchClients, searchClients, setSearchQuery, setSubscriptionFilter, setPage,
+    createClient, updateClient, deleteClient 
   } = useClientsStore()
   
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -77,6 +78,15 @@ export function Clients() {
         toast.success('Клиент добавлен')
       }
     } catch (error) {
+      const message = (error as any)?.message || ''
+      if (
+        (typeof message === 'string' && message.includes('CLIENT_DUPLICATE')) ||
+        (error as any)?.code === 'CLIENT_DUPLICATE'
+      ) {
+        toast.error('Такой клиент уже создан (ФИО и дата рождения)')
+        return
+      }
+      console.error('Error saving client:', error)
       toast.error('Ошибка')
     }
   }
@@ -84,9 +94,23 @@ export function Clients() {
   const handlePayment = async (date: string) => {
     if (!payingClient) return
     try {
-      await updatePaymentDate(payingClient.id, date)
+      const subscriptionTypeId = (payingClient as any).current_subscription_type_id
+      if (!subscriptionTypeId) {
+        toast.error('У клиента не выбран тип абонемента')
+        return
+      }
+
+      await subscriptionsApi.assign({
+        client_id: payingClient.id,
+        subscription_id: subscriptionTypeId,
+        start_date: date,
+        is_paid: true
+      })
+
+      await fetchClients()
       toast.success('Оплата отмечена')
     } catch (error) {
+      console.error('Error renewing subscription:', error)
       toast.error('Ошибка')
     }
   }
@@ -112,13 +136,26 @@ export function Clients() {
       <div className="flex-1 p-6">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
           <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-4 justify-between">
-            <div className="flex-1 max-w-md">
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                onSearch={handleSearch}
-                placeholder="Поиск по ФИО или телефону..."
-              />
+            <div className="flex flex-1 gap-4">
+              <div className="flex-1 max-w-md">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onSearch={handleSearch}
+                  placeholder="Поиск по ФИО или телефону..."
+                />
+              </div>
+              <Select value={subscriptionFilter} onValueChange={(value: 'all' | 'active' | 'expired' | 'unpaid') => setSubscriptionFilter(value)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Статус абонемента" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все</SelectItem>
+                  <SelectItem value="active">Активный абонемент</SelectItem>
+                  <SelectItem value="expired">Истёк/нет абонемента</SelectItem>
+                  <SelectItem value="unpaid">Не оплачен</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button 
               onClick={handleCreate}

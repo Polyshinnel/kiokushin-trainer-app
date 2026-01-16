@@ -13,12 +13,30 @@ export interface Employee {
 export interface Client {
   id: number
   full_name: string
+  birth_date: string | null
   birth_year: number | null
   phone: string | null
   last_payment_date: string | null
+  doc_type: 'passport' | 'certificate' | null
+  doc_series: string | null
+  doc_number: string | null
+  doc_issued_by: string | null
+  doc_issued_date: string | null
+  home_address: string | null
+  workplace: string | null
   created_at: string
   updated_at: string
   sync_status: string
+  current_subscription_id?: number | null
+  current_subscription_type_id?: number | null
+  current_subscription_name?: string | null
+  current_subscription_price?: number | null
+  current_subscription_start_date?: string | null
+  current_subscription_end_date?: string | null
+  current_subscription_visits_used?: number | null
+  current_subscription_visits_total?: number | null
+  current_subscription_is_paid?: number | null
+  current_subscription_status?: 'paid' | 'unpaid' | 'expired' | 'none'
 }
 
 export interface ClientParent {
@@ -88,3 +106,48 @@ export interface NavItem {
   icon: React.ReactNode
 }
 
+export interface Subscription {
+  id: number
+  name: string
+  price: number
+  duration_days: number
+  visit_limit: number
+  is_active: number
+  created_at: string
+  updated_at: string
+  sync_status: string
+}
+
+export interface ClientSubscription {
+  id: number
+  client_id: number
+  subscription_id: number
+  subscription_name?: string
+  subscription_price?: number
+  start_date: string
+  end_date: string
+  visits_used: number
+  visits_total: number
+  is_paid: number
+  payment_date: string | null
+  client_name?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface GroupAttendanceMatrix {
+  lessons: Lesson[]
+  members: {
+    client_id: number
+    client_name: string
+    client_phone: string | null
+  }[]
+  attendance: Record<number, Record<number, AttendanceStatus>>
+}
+
+export interface CalendarDay {
+  date: Date
+  dayOfMonth: number
+  isCurrentMonth: boolean
+  lessons: Lesson[]
+}
