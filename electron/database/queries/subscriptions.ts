@@ -160,11 +160,20 @@ export const subscriptionQueries = {
         AND cs.end_date >= date('now')
         AND cs.start_date <= date('now')
         AND (cs.visits_total = 0 OR cs.visits_used < cs.visits_total)
+        AND NOT EXISTS (
+          SELECT 1
+          FROM client_subscriptions cs2
+          WHERE cs2.client_id = cs.client_id
+            AND cs2.subscription_id = cs.subscription_id
+            AND cs2.start_date = cs.start_date
+            AND cs2.visits_used > cs.visits_used
+        )
       ORDER BY 
         CASE WHEN cs.is_paid = 1 THEN 0 ELSE 1 END,
         CASE WHEN cs.visits_total > 0 THEN 0 ELSE 1 END,
         cs.end_date ASC,
-        cs.start_date DESC
+        cs.start_date DESC,
+        cs.id DESC
       LIMIT 1
     `).get(clientId) as ClientSubscription | undefined
   },
@@ -181,6 +190,50 @@ export const subscriptionQueries = {
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + subscription.duration_days)
 
+    const startDateValue = data.start_date
+    const endDateValue = endDate.toISOString().split('T')[0]
+    const existing = db.prepare(`
+      SELECT id, visits_used, visits_total, end_date
+      FROM client_subscriptions
+      WHERE client_id = ? AND subscription_id = ? AND start_date = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `).get(data.client_id, data.subscription_id, startDateValue) as
+      | { id: number; visits_used: number; visits_total: number; end_date: string }
+      | undefined
+
+    if (existing) {
+      const isExpiredByVisits = existing.visits_total > 0 && existing.visits_used >= existing.visits_total
+      const isExpiredByDate = new Date(existing.end_date) < new Date(startDateValue)
+      const nextVisitsUsed = isExpiredByVisits || isExpiredByDate ? 0 : existing.visits_used
+
+      db.prepare(`
+        UPDATE client_subscriptions
+        SET end_date = ?,
+            visits_used = ?,
+            visits_total = ?,
+            is_paid = ?,
+            payment_date = ?,
+            updated_at = CURRENT_TIMESTAMP,
+            sync_status = 'pending'
+        WHERE id = ?
+      `).run(
+        endDateValue,
+        nextVisitsUsed,
+        subscription.visit_limit,
+        data.is_paid ? 1 : 0,
+        data.is_paid ? startDateValue : null,
+        existing.id
+      )
+
+      return db.prepare(`
+        SELECT cs.*, s.name as subscription_name, s.price as subscription_price
+        FROM client_subscriptions cs
+        JOIN subscriptions s ON s.id = cs.subscription_id
+        WHERE cs.id = ?
+      `).get(existing.id) as ClientSubscription
+    }
+
     const result = db.prepare(`
       INSERT INTO client_subscriptions 
       (client_id, subscription_id, start_date, end_date, visits_total, is_paid, payment_date)
@@ -188,11 +241,11 @@ export const subscriptionQueries = {
     `).run({
       client_id: data.client_id,
       subscription_id: data.subscription_id,
-      start_date: data.start_date,
-      end_date: endDate.toISOString().split('T')[0],
+      start_date: startDateValue,
+      end_date: endDateValue,
       visits_total: subscription.visit_limit,
       is_paid: data.is_paid ? 1 : 0,
-      payment_date: data.is_paid ? data.start_date : null
+      payment_date: data.is_paid ? startDateValue : null
     })
 
     return db.prepare(`

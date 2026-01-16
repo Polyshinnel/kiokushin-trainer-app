@@ -266,6 +266,54 @@ const migrations: Migration[] = [
       `)
       console.log('Migration 5: Added index for lessons(group_id, lesson_date)')
     }
+  },
+  {
+    version: 6,
+    name: 'dedupe_client_subscriptions',
+    up: (db: Database.Database) => {
+      const duplicates = db.prepare(`
+        SELECT client_id, subscription_id, start_date, MAX(visits_used) as max_visits_used
+        FROM client_subscriptions
+        GROUP BY client_id, subscription_id, start_date
+        HAVING COUNT(*) > 1
+      `).all() as { client_id: number; subscription_id: number; start_date: string; max_visits_used: number }[]
+
+      if (duplicates.length === 0) return
+
+      const selectKeep = db.prepare(`
+        SELECT id
+        FROM client_subscriptions
+        WHERE client_id = ? AND subscription_id = ? AND start_date = ? AND visits_used = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `)
+      const updateKeep = db.prepare(`
+        UPDATE client_subscriptions
+        SET visits_used = ?, updated_at = CURRENT_TIMESTAMP, sync_status = 'pending'
+        WHERE id = ?
+      `)
+      const deleteOthers = db.prepare(`
+        DELETE FROM client_subscriptions
+        WHERE client_id = ? AND subscription_id = ? AND start_date = ? AND id != ?
+      `)
+
+      const apply = db.transaction(() => {
+        for (const dup of duplicates) {
+          const keep = selectKeep.get(
+            dup.client_id,
+            dup.subscription_id,
+            dup.start_date,
+            dup.max_visits_used
+          ) as { id: number } | undefined
+          if (!keep) continue
+          updateKeep.run(dup.max_visits_used, keep.id)
+          deleteOthers.run(dup.client_id, dup.subscription_id, dup.start_date, keep.id)
+        }
+      })
+
+      apply()
+      console.log(`Migration 6: Deduped client_subscriptions (${duplicates.length} groups)`)
+    }
   }
 ]
 

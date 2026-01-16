@@ -126,8 +126,17 @@ const latestSubscriptionJoin = `
     JOIN (
       SELECT client_id, MAX(start_date) as max_start
       FROM client_subscriptions
+      WHERE date(start_date) <= date('now')
       GROUP BY client_id
     ) latest ON latest.client_id = cs.client_id AND latest.max_start = cs.start_date
+    JOIN (
+      SELECT client_id, start_date, MAX(id) as max_id
+      FROM client_subscriptions
+      WHERE date(start_date) <= date('now')
+      GROUP BY client_id, start_date
+    ) latest_id ON latest_id.client_id = cs.client_id
+      AND latest_id.start_date = cs.start_date
+      AND latest_id.max_id = cs.id
     JOIN subscriptions s ON s.id = cs.subscription_id
   ) ls ON ls.client_id = c.id
 `

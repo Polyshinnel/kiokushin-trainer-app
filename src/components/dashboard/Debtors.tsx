@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, CreditCard, ChevronRight, Phone } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useClientsStore } from '@/stores/clientsStore'
 import { subscriptionsApi } from '@/lib/api'
 
 export function Debtors() {
   const navigate = useNavigate()
-  const { debtors, fetchDebtors } = useClientsStore()
+  const { debtors, fetchDebtors, fetchClients } = useClientsStore()
 
   useEffect(() => {
     fetchDebtors()
@@ -17,14 +18,24 @@ export function Debtors() {
 
   const handlePayment = async (clientId: number, subscriptionTypeId?: number | null) => {
     const today = new Date().toISOString().split('T')[0]
-    if (!subscriptionTypeId) return
-    await subscriptionsApi.assign({
-      client_id: clientId,
-      subscription_id: subscriptionTypeId,
-      start_date: today,
-      is_paid: true
-    })
-    await fetchDebtors()
+    if (!subscriptionTypeId) {
+      toast.error('У клиента не выбран тип абонемента')
+      return
+    }
+    try {
+      await subscriptionsApi.assign({
+        client_id: clientId,
+        subscription_id: subscriptionTypeId,
+        start_date: today,
+        is_paid: true
+      })
+      await fetchDebtors()
+      await fetchClients()
+      toast.success('Оплата отмечена')
+    } catch (error) {
+      console.error('Error marking payment from debtors:', error)
+      toast.error('Ошибка')
+    }
   }
 
   return (
